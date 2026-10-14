@@ -1,0 +1,42 @@
+// An internal module: only what is `pub` is visible to main.tr and the tests.
+import map::Map;
+import list::List;
+
+pub error StockError {
+    UnknownItem(name: string),
+    Insufficient(name: string, have: int, want: int)
+}
+
+pub struct Stock {
+    counts: Map<string, int>      // private field: callers go through methods
+}
+
+// A broken precondition is a bug in the caller: panic, naming the caller's line.
+@caller_location
+pub fn Stock.add(name: string, qty: int): void {
+    if qty <= 0 {
+        sys::panic(caller_location + ": Stock.add: quantity must be positive");
+    }
+    immut have: int = self.counts.try_get(name) recover produce 0;
+    self.counts[name] = have + qty;
+}
+
+pub fn Stock.take(name: string, qty: int): !int {
+    if !self.counts.contains(name) {
+        return StockError::UnknownItem(name);
+    }
+    immut have: int = self.counts[name];
+    if have < qty {
+        return StockError::Insufficient(name, have, qty);
+    }
+    self.counts[name] = have - qty;
+    return have - qty;
+}
+
+pub fn Stock.count(name: string): int {
+    return self.counts.try_get(name) recover produce 0;
+}
+
+pub fn Stock.names(): List<string> {
+    return self.counts.keys();
+}

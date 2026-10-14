@@ -1,0 +1,8 @@
+// EXPECT-DIAG: E088
+import stock::Stock;
+
+fn main(): int {
+    mut s: Stock = Stock::default();
+    printline(s.counts.length());
+    return 0;
+}

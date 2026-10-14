@@ -1,0 +1,93 @@
+// Generics, operator overloading, enums, a state machine and compare.
+import list::List;
+
+struct Stack<T> {
+    items: List<T>
+}
+
+fn<T> Stack.push(v: T): void { self.items.push(v); }
+fn<T> Stack.pop(): T { return self.items.pop(); }
+fn<T> Stack.is_empty(): bool { return self.items.length() == 0; }
+
+struct Money {
+    cents: int
+}
+
+fn Money.new(cents: int): void { self.cents = cents; }
+
+operator +(a: Money, b: Money): Money { return Money::new(a.cents + b.cents); }
+operator ==(a: Money, b: Money): bool { return a.cents == b.cents; }
+operator <(a: Money, b: Money): bool { return a.cents < b.cents; }
+
+fn<T> largest(items: List<T>): T {
+    mut best: T = items[0];
+    for i in 1..items.length() {
+        if best < items[i] {          // works for any T that has operator <
+            best = items[i];
+        }
+    }
+    return best;
+}
+
+fn show(m: Money): string {
+    immut sign: string = m.cents < 0 give "-" otherwise "";
+    immut c: int = m.cents.abs();
+    immut cents: string = strings::pad_left((c % 100) to string, 2, '0');
+    return sign + "$" + ((c / 100) to string) + "." + cents;
+}
+
+machine Door {
+    Closed -> Open,
+    Open -> Closed,
+    Closed -> Locked,
+    Locked -> Closed
+}
+
+enum Cmd { Open, Close, Lock, Unlock }
+
+// Matching on a plain variable lets the compiler prove each transition.
+fn apply_cmd(d: Door, c: Cmd): Door {
+    mut s: Door = d;
+    compare s {
+        matches Door::Closed:
+        if c == Cmd::Open { s.transition(Door::Open); }
+        elseif c == Cmd::Lock { s.transition(Door::Locked); }
+        done
+        matches Door::Open:
+        if c == Cmd::Close { s.transition(Door::Closed); }
+        done
+        matches Door::Locked:
+        if c == Cmd::Unlock { s.transition(Door::Closed); }
+        done
+    }
+    return s;
+}
+
+fn main(): int {
+    mut st: Stack<string> = Stack::default();
+    st.push("a");
+    st.push("b");
+    mut popped: string = "";
+    while !st.is_empty() {
+        popped = popped + st.pop();
+    }
+    printline(popped);                          // ba
+
+    mut wallet: List<Money> = List::default();
+    wallet.push(Money::new(250));
+    wallet.push(Money::new(1999));
+    wallet.push(Money::new(5));
+    mut total: Money = Money::new(0);
+    for i in 0..wallet.length() {
+        total += wallet[i];                     // += uses operator +
+    }
+    printline(show(total) + " max " + show(largest(wallet)));
+
+    mut d: Door = Door::Closed;
+    immut cmds: Cmd[4] = [Cmd::Open, Cmd::Lock, Cmd::Close, Cmd::Lock];
+    for c in cmds {
+        d = apply_cmd(d, c);
+        printline((c to string) + " -> " + (d to string));
+    }
+    return 0;
+}

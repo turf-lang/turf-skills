@@ -1,0 +1,69 @@
+// Word frequency: strings, List, Map, sorting with a comparator, give/otherwise.
+import list::List;
+import map::Map;
+
+struct Entry {
+    word: string,
+    count: int
+}
+
+fn Entry.new(word: string, count: int): void {
+    self.word = word;
+    self.count = count;
+}
+
+// Sort descending by count, then ascending by word.
+fn by_count(a: Entry, b: Entry): int {
+    if a.count != b.count {
+        return b.count - a.count;
+    }
+    return a.word < b.word give -1 otherwise (a.word == b.word give 0 otherwise 1);
+}
+
+fn is_letter(c: char): bool {
+    return c.is_alpha();
+}
+
+// Split on anything that is not a letter, lower-casing as we go.
+fn words_of(text: string): List<string> {
+    mut out: List<string> = List::default();
+    mut current: strings::StringBuilder = strings::StringBuilder::default();
+    for i in 0..text.length() {
+        immut c: char = text[i];
+        if is_letter(c) {
+            current.append_char(c.to_lower());
+        } elseif current.length() > 0 {
+            out.push(current.to_string());
+            current.clear();
+        }
+    }
+    if current.length() > 0 {
+        out.push(current.to_string());
+    }
+    return out;
+}
+
+fn main(): int {
+    immut text: string = "The cat and the hat. The CAT sat; a hat is a hat!";
+    immut words: List<string> = words_of(text);
+
+    mut counts: Map<string, int> = Map::default();
+    for i in 0..words.length() {
+        immut w: string = words[i];
+        immut seen: int = counts.try_get(w) recover produce 0;
+        counts[w] = seen + 1;
+    }
+
+    mut entries: List<Entry> = List::default();
+    immut keys: List<string> = counts.keys();
+    for i in 0..keys.length() {
+        entries.push(Entry::new(keys[i], counts[keys[i]]));
+    }
+    entries.sort(by_count);
+
+    for i in 0..entries.length() {
+        immut e: Entry = entries[i];
+        printline(e.word + ": " + (e.count to string));
+    }
+    return 0;
+}

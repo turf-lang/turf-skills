@@ -1,0 +1,29 @@
+import stock;
+import stock::Stock;
+import test;
+
+// "" when take succeeds, otherwise a description of the error.
+fn failure(s: &Stock, name: string, qty: int): string {
+    immut _left: int = s.take(name, qty) recover as err run {
+        compare err {
+            matches stock::StockError::Insufficient(n, have, want):
+            return n + " " + (have to string) + "/" + (want to string);
+            done
+            matches stock::StockError::UnknownItem(n):
+            return "unknown " + n;
+            done
+            otherwise:
+            return "other";
+        }
+    };
+    return "";
+}
+
+fn main(): int {
+    mut s: Stock = Stock::default();
+    s.add("nut", 3);
+    test::assert_eq(failure(&s, "nut", 5), "nut 3/5", "too many");
+    test::assert_eq(failure(&s, "gear", 1), "unknown gear", "unknown item");
+    test::assert_eq(failure(&s, "nut", 3), "", "exactly enough");
+    return 0;
+}

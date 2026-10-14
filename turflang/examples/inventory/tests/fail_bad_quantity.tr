@@ -1,0 +1,9 @@
+// RUNTIME_ABORT_EXPECTED
+// EXPECT-RUNTIME: Stock.add: quantity must be positive
+import stock::Stock;
+
+fn main(): int {
+    mut s: Stock = Stock::default();
+    s.add("bolt", 0);
+    return 0;
+}

@@ -1,0 +1,29 @@
+import stock;
+import stock::Stock;
+
+fn report(s: &Stock, name: string, qty: int): void {
+    immut left: int = s.take(name, qty) recover as err run {
+        compare err {
+            matches stock::StockError::UnknownItem(n):
+            printline("no such item: " + n);
+            done
+            matches stock::StockError::Insufficient(n, have, want):
+            printline(n + ": want " + (want to string) + ", have " + (have to string));
+            done
+            otherwise:
+            printline("unexpected: " + err.message);
+        }
+        return;
+    };
+    printline(name + ": " + (left to string) + " left");
+}
+
+fn main(): int {
+    mut s: Stock = Stock::default();
+    s.add("bolt", 10);
+    s.add("nut", 3);
+    report(&s, "bolt", 4);
+    report(&s, "nut", 5);
+    report(&s, "gear", 1);
+    return 0;
+}

@@ -1,0 +1,16 @@
+import stock;
+import stock::Stock;
+import test;
+
+fn main(): int {
+    mut s: Stock = Stock::default();
+    s.add("bolt", 10);
+    immut left: int = s.take("bolt", 4) recover as err run {
+        test::fail("take failed: " + err.message);
+        return 1;
+    };
+    test::assert_eq(left, 6, "six left");
+    test::assert_eq(s.count("bolt"), 6, "count agrees");
+    test::assert_eq(s.count("gear"), 0, "unknown items count as zero");
+    return 0;
+}

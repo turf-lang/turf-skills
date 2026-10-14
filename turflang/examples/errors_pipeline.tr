@@ -1,0 +1,86 @@
+// Error handling end to end: error types with payloads, !T, try, the three
+// recover forms, compare on an error, defer on every exit path.
+import list::List;
+
+error ConfigError {
+    Empty,
+    BadLine(line: int, text: string),
+    BadValue(key: string, value: string)
+}
+
+struct Setting {
+    key: string,
+    value: int
+}
+
+fn Setting.new(key: string, value: int): void {
+    self.key = key;
+    self.value = value;
+}
+
+// One "key=number" line. Fails with a payload describing what went wrong.
+fn parse_line(n: int, line: string): !Setting {
+    immut eq: int = strings::index_of(line, "=");
+    if eq <= 0 {
+        return ConfigError::BadLine(n, line);
+    }
+    immut key: string = strings::trim(strings::substring(line, 0, eq));
+    immut raw: string = strings::trim(strings::substring(line, eq + 1, line.length()));
+    // parse_int is fallible; translate its failure into our own error type.
+    immut value: int = strings::parse_int(raw) recover run {
+        return ConfigError::BadValue(key, raw);
+    };
+    return Setting::new(key, value);
+}
+
+// try hands any failure to our caller unchanged.
+fn parse_all(text: string): !List<Setting> {
+    if strings::trim(text) == "" {
+        return ConfigError::Empty("config text was blank");
+    }
+    mut out: List<Setting> = List::default();
+    immut lines: List<string> = strings::split(text, "\n");
+    for i in 0..lines.length() {
+        if strings::trim(lines[i]) == "" {
+            continue;
+        }
+        out.push(try parse_line(i + 1, lines[i]));
+    }
+    return out;
+}
+
+// A helper turns the error into this function's return value: inside a
+// recover block, `return` leaves describe(), not the recover expression.
+fn describe(text: string): string {
+    defer printline("  (checked)");
+    immut settings: List<Setting> = parse_all(text) recover as err run {
+        compare err {
+            matches ConfigError::BadLine(line, t):
+            return "line " + (line to string) + " is not key=value: '" + t + "'";
+            done
+            matches ConfigError::BadValue(key, v):
+            return "'" + key + "' has a non-numeric value '" + v + "'";
+            done
+            matches ConfigError::Empty:
+            return "empty: " + err.message;
+            done
+            otherwise:
+            return "unexpected error";
+        }
+    };
+    mut total: int = 0;
+    for i in 0..settings.length() {
+        total += settings[i].value;
+    }
+    return (settings.length() to string) + " settings, total " + (total to string);
+}
+
+fn main(): int {
+    printline(describe("width = 80\nheight=24\n"));
+    printline(describe("width = 80\nheight 24"));
+    printline(describe("depth = deep"));
+    printline(describe("   "));
+    immut n: int = strings::parse_int("x42") recover produce -1;
+    printline(n to string);
+    return 0;
+}

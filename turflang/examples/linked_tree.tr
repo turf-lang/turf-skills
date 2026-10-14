@@ -1,0 +1,66 @@
+// References: &T, &?T with null narrowing, heap(), methods that recurse,
+// passing &value so a callee can mutate the caller's struct.
+struct Tree {
+    key: int,
+    left: &?Tree,
+    right: &?Tree
+}
+
+fn Tree.new(key: int): void {
+    self.key = key;
+    self.left = null;
+    self.right = null;
+}
+
+fn Tree.insert(key: int): void {
+    if key < self.key {
+        mut l: &?Tree = self.left;          // a field must be copied into a variable...
+        if l == null {
+            self.left = heap(Tree::new(key)); // heap(): outlives this call
+        } else {
+            l.insert(key);                  // ...so the null check can narrow it
+        }
+    } else {
+        mut r: &?Tree = self.right;
+        if r == null {
+            self.right = heap(Tree::new(key));
+        } else {
+            r.insert(key);
+        }
+    }
+}
+
+fn in_order(t: &?Tree, out: &Acc): void {
+    if t == null {
+        return;
+    }
+    in_order(t.left, out);
+    out.text = out.text + (t.key to string) + " ";
+    out.count++;
+    in_order(t.right, out);
+}
+
+fn height(t: &?Tree): int {
+    if t == null {
+        return 0;
+    }
+    return 1 + max(height(t.left), height(t.right));
+}
+
+struct Acc {
+    text: string,
+    count: int
+}
+
+fn main(): int {
+    mut root: Tree = Tree::new(50);
+    immut keys: int[8] = [30, 70, 20, 40, 60, 80, 35, 65];
+    for k in keys {
+        root.insert(k);
+    }
+    mut acc: Acc = Acc::default();
+    in_order(&root, &acc);
+    printline(acc.text);
+    printline("count=" + (acc.count to string) + " height=" + (height(&root) to string));
+    return 0;
+}
