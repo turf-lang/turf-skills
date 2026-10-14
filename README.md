@@ -8,14 +8,36 @@ Agent skills for working with [TurfLang](https://github.com/turf-lang/turf-lang)
 
 ## Install
 
-Copy or symlink a skill folder into your agent's skills directory. For Claude Code:
+```sh
+npx turflang-skills
+```
+
+or, with the generic [skills](https://github.com/vercel-labs/skills) CLI:
 
 ```sh
-# personal (all projects)
-ln -s "$PWD/turflang" ~/.claude/skills/turflang
-# or per project
-mkdir -p .claude/skills && cp -r turflang .claude/skills/
+npx skills@latest add turf-lang/turf-skills
 ```
+
+Either command asks:
+- which agents to install for (Claude Code, Cursor, Codex, OpenCode, GitHub Copilot, Windsurf and 70+ others);
+- whether to install for this project or for your user (global);
+- whether to symlink or copy.
+
+Requires Node.js 22.20 or newer.
+
+Non-interactive examples:
+
+```sh
+npx turflang-skills -g -a claude-code -y          # global, Claude Code only
+npx turflang-skills -a claude-code cursor codex -y   # this project, three agents
+npx turflang-skills --github                      # latest from GitHub instead of the npm-bundled copy
+npx turflang-skills update                        # update installed skills
+npx turflang-skills remove turflang               # uninstall
+```
+
+`npx turflang-skills` installs the copy bundled with that npm version. `npx skills add turf-lang/turf-skills` (or `--github`) installs whatever is on `master`.
+
+**Manual install:** copy the `turflang/` folder into your agent's skills directory, for example `~/.claude/skills/turflang` for Claude Code.
 
 A skill is `SKILL.md` (always read) plus `references/` and `examples/`, which the agent opens when it needs them.
 
@@ -32,6 +54,16 @@ references/porting.md            idiom map from other languages, 1.x → 2.0
 examples/*.tr                    complete programs (compiled and run)
 examples/inventory/              a small project with tests
 ```
+
+## Releasing to npm
+
+```sh
+npm version patch      # or minor / major: bumps package.json and tags
+npm publish
+git push --follow-tags
+```
+
+`npm pack --dry-run` lists what gets published: `bin/`, `turflang/`, `README.md` and `LICENSE`.
 
 ## Keeping it accurate
 

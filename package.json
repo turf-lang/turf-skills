@@ -1,0 +1,40 @@
+{
+  "name": "turflang-skills",
+  "version": "1.0.0",
+  "description": "Agent skills for TurfLang: install the turflang skill into Claude Code, Cursor, Codex and 70+ other coding agents.",
+  "keywords": [
+    "turf",
+    "turflang",
+    "agent-skills",
+    "skills",
+    "claude-code",
+    "cursor",
+    "codex",
+    "ai"
+  ],
+  "homepage": "https://github.com/turf-lang/turf-skills#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/turf-lang/turf-skills.git"
+  },
+  "bugs": {
+    "url": "https://github.com/turf-lang/turf-skills/issues"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "turflang-skills": "bin/install.mjs"
+  },
+  "files": [
+    "bin/",
+    "turflang/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.20.0"
+  },
+  "dependencies": {
+    "skills": "^1.7.2"
+  }
+}
