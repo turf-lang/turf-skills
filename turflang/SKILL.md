@@ -1,13 +1,13 @@
 ---
 name: turflang
-description: Write, read, debug, fix, test and port code in TurfLang (Turf), the statically typed LLVM-compiled language with `.tr` files, `turf`/`turfc` compilers, `turf.toml` projects and the `--smart` local-model diagnostics. Use whenever a task touches `.tr` files, Turf syntax, Turf compile errors (E001–E149), runtime panics, the Turf standard library, `turf test`, or rewriting code into or out of Turf.
+description: Write, read, debug, fix, test and port code in TurfLang (Turf), the statically typed LLVM-compiled language with `.tr` files, `turf`/`turfc` compilers, `turf.toml` projects and the `--smart` local-model diagnostics. Use whenever a task touches `.tr` files, Turf syntax, Turf compile errors (E001–E150), runtime panics, the Turf standard library, `turf test`, or rewriting code into or out of Turf.
 ---
 
 # TurfLang
 
 Turf is not C, Rust, Go or Python, even where it looks like them. Most mistakes agents make come from guessing syntax from those languages. This skill gives you the real rules. **Do not guess Turf syntax; check it here or in `references/`.**
 
-Turf 2.0: static types, ahead-of-time compiled through LLVM, garbage-collected heap, checked references (`&T`, `&?T`), real monomorphized generics, error unions (`!T` with `recover`/`try`), `compare` pattern matching, `machine` state machines, and checked arithmetic and indexing. Release builds keep every runtime check.
+Turf 2.1: static types, ahead-of-time compiled through LLVM, garbage-collected heap, checked references (`&T`, `&?T`), real monomorphized generics, error unions (`!T` with `recover`/`try`), `compare` pattern matching, `machine` state machines, and checked arithmetic and indexing. Release builds keep every runtime check.
 
 ## Files in this skill
 
@@ -135,7 +135,7 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
 
 **Declarations and types**
 - A declaration always starts with `mut`/`mutable` or `immut`/`immutable`: `mut x: int = 1;`. You cannot write `int x`, `let`, `var`, or `x := 1`.
-- `immut` needs an initializer. A `mut` declared without one (`mut x: int;`) must be assigned on **every** path before it is read (E008). There is no implicit zero.
+- `immut` needs an initializer. A `mut` scalar or struct declared without one (`mut x: int;`) must be assigned on **every** path before it is read (E008). There is no implicit zero. A fixed-size array `mut a: int[N];` is the exception: it is zero-filled from its declaration, so reading it is never E008. `(&T)[N]` and unsized `T[]` still need an initializer (E128).
 - Inference comes from the initializer only (`mut x = 5;`). Parameters, return types and fields always have written types.
 - Numeric types: `int` (64-bit, signed), `int32` (for C interop only), `double`. There is no `float` (it is a reserved word), and there are no unsigned types or other widths.
 - `char` is one byte, not a number and not a string: `'a' + 1` is E057; write `(c to int) + 1`. `s[i]` is a `char`; compare it with `'x'`, not with `120`.
@@ -177,6 +177,7 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
   - A file may write `m::` only for modules it imports itself (E145).
 - Across modules, everything is **private unless `pub`**, and that includes struct fields inside a `pub struct` (E088). A `pub` function cannot expose a non-`pub` type (E089). A single-file program needs no `pub`.
 - Generic type arguments are never written at a use site: `identity<int>(3)` and `Box<int>::default()` do not parse (E110). Put the type on the declaration instead: `mut b: Box<int> = Box::default();`. `mut l = List::default();` is E129.
+- An array length can be a generic parameter: `fn<T, N: size> fill(v: T): T[N]`. `N` is never written at a call; it comes from an array argument or from the type the result is stored into (`mut z: int[8] = fill(0);`), else E129. Free functions only: on a struct, method or operator, as a type, or assigned, it is E150.
 
 **Errors**
 - Fallible functions return `!T`. A `!T` is not a `T`; resolve it with one of:
@@ -184,13 +185,13 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
   - `expr recover run { ...must return/break/continue unless T is void... }`
   - `expr recover as err run { ... err.message ... compare err { ... } }`
   - or propagate it with `try expr` (only inside a function that itself returns `!V`, never in `main`, E095).
-- `recover` binds more loosely than any operator: write `1 + (f() recover produce 0)`.
+- `recover` binds more loosely than any operator, `=` and `+=` included: write `1 + (f() recover produce 0)` and `v = (f() recover run { ... });` (`v = f() recover ...` is E066).
 - Payloads are read **only** by destructuring: `matches ParseError::Bad(at, text):`. Use `err.message` for the optional message string. `err == ParseError::Bad` compares only the variant.
 - A `compare` on the `err` from `recover as err` always needs `otherwise:`, because the error union is open.
 - Panics (bounds, overflow, `sys::panic`, a failed `test::assert`) abort the process with exit status 134. You cannot catch them.
 
 **Collections, arrays, strings**
-- `T[N]` is a fixed-size value type. Assignment copies it, and its size is part of the type.
+- `T[N]` is a fixed-size value type. Assignment copies it, and its size is part of the type. `mut a: int[1000];` reads as all zeros until written; `import arrays;` has `arrays::fill(0)`, `generate`, `reversed`, `map` (length from the target type; not the prelude `array`).
 - Indexing accepts negative indices (`a[-1]` is the last element) and is bounds-checked. A constant out-of-range index is a compile error (E001).
 - `arr[a..b]` is a view (`T[]`). A `T[]` cannot be returned or stored (E140); return `T[N]` or a `List<T>`.
 - `List`, `Map`, `Set`, `Stack` and `Queue` are **handles**: assigning one shares it, so call `.copy()` for an independent one. `List::default()` is ready to use, and so is a defaulted struct field of collection type.

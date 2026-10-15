@@ -74,7 +74,7 @@ An error with exactly one right edit also ends with a `Fix:` block (TurfLang 2.1
 | `Operator applied to the wrong kind of value` (E057) | `string + int`; arithmetic on `char`/`bool`; operands of a user `operator` don't match exactly | `(x to string)`, `(c to int)`, exact operand types |
 | `Type mismatch!` (E066) | wrong type assigned; a `!T` used as `T`; `int` var given a `double`; the branches of `give/otherwise` differ | `to`, `recover`, fix the declaration |
 | E064 | returned value doesn't match the return type, including a return inside `recover` checked against the enclosing function | |
-| `before it has a value` (E008) | some path reads it before assigning | initialize at declaration (`T::default()` for structs) |
+| `before it has a value` (E008) | some path reads it before assigning (not for `T[N]` arrays, which start zero-filled) | initialize at declaration (`T::default()` for structs) |
 | `promises to give back a result, but sometimes it doesn't` (E009) | a path with no `return` | add the final `return`, or make the `compare` exhaustive |
 | `Non-exhaustive ... comparison` (E093) | `compare` misses enum variants / `true`/`false` / error variants, or a `compare err` without `otherwise` | add the listed arms or `otherwise:` |
 | `Expected 'done' after matches arm body` (E058) | missing `done`, or `otherwise` not last | |
@@ -86,7 +86,8 @@ An error with exactly one right edit also ends with a `Fix:` block (TurfLang 2.1
 | `Raw pointer ... outside an 'unsafe' block` (E130) | pointer types or casts outside `unsafe`, or in a function signature | use `&T`/`&?T`; wrap the FFI in `unsafe { }` |
 | `Expected ...` / `Unexpected token` (E102, E103, E107, E108, E110) | syntax: missing `;`, `{`, `:` return type, a reserved word as a name (`step`, `float`, `guess`, ...), `f<int>(x)`, `/* */` comment | see `error-codes.md` |
 | `Missing type parameters!` (E138) | `fn Box.get()` on a generic struct, or a type used without its arguments | `fn<T> Box.get()`, `Box<int>` |
-| `Nothing to infer!` (E129) | `mut l = List::default();` | `mut l: List<int> = List::default();` |
+| `Nothing to infer!` (E129) | `mut l = List::default();`; a size parameter no array argument or target type gives (`mut d = fill(0);`) | `mut l: List<int> = List::default();`; `mut d: int[4] = fill(0);` |
+| E150 | size parameter (`N: size`) on a struct/method/operator, used as a type, or assigned | free function only; copy it first: `mut n: int = N;` |
 | `No entry point found` (E119) | checked a module as a program | add `--module`, or write `fn main(): int` |
 
 ## 4. `--smart`: model-assisted fixes
@@ -138,8 +139,8 @@ turfc --check prog.tr --smart               # works with --check too
 | missing return on some path | E009 error |
 | read before assignment | E008 error |
 | `new` doesn't assign every field on every path | E049 error |
-| unused variable / dead store | warning (prefix `_` to mark intentional) |
-| `while true` with no exit | warning ×3 (fine for a server loop) |
+| unused variable / dead store / initializer overwritten before any read ("initial value ... never read": declare `mut x: int;`) | warning (prefix `_` to mark intentional); none are reported falsely inside `recover run { }` blocks or for single-element array writes |
+| `while true` with no exit (a `break`/`return` inside `recover`, `compare` or `unsafe` counts as an exit) | warning ×3 (fine for a server loop) |
 | infinite self-recursion (every path recurses) | E010 error |
 | constant index out of bounds / bad constant slice | E001 / E143 error |
 | double free / use after free (only `@ownership`-annotated allocators) | E017/E018 error, warning on some paths |

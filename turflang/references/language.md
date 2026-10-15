@@ -1,4 +1,4 @@
-# TurfLang 2.0 language reference (condensed)
+# TurfLang 2.1 language reference (condensed)
 
 Condensed from the official reference (`docs/reference/*.md` in the turf-lang repo). Every rule here comes from those pages. The codes in parentheses are what the compiler reports when you break the rule; look them up in `error-codes.md`.
 
@@ -39,7 +39,7 @@ Contents: 1 Lexical · 2 Variables & types · 3 Conversions · 4 Operators · 5 
 - **Definite assignment:** a `mut` declared without a value must be assigned on every path before it is read (E008).
   - A loop body may run zero times, so an assignment inside it does not count.
   - A struct counts as assigned only as a whole; writing a field of an unassigned struct is E008. Start from `T::default()`.
-  - An array counts as assigned once it is written whole or any one element is written. Elements never written then read as zero.
+  - A fixed-size array `T[N]` is not tracked: it is zero-filled from its declaration, so `mut a: int[10];` can be read before any write (no E008). `(&T)[N]` and unsized `T[]` need an initializer (E128).
 - **Shadowing** an outer variable is allowed but warns.
 
 | Type | Notes |
@@ -62,7 +62,7 @@ Contents: 1 Lexical · 2 Variables & types · 3 Conversions · 4 Operators · 5 
 - an enum's first variant;
 - `null` for `&?T`, pointers and functions;
 - a fresh default object for `&T`;
-- recursive defaults for nested structs and arrays;
+- recursive defaults for nested structs and arrays (a declared `T[N]` starts as these);
 - empty, ready-to-use collections.
 
 ## 3. Conversions: `to`
@@ -290,7 +290,7 @@ fn main(): int {
   - `e recover run { ... }`: the block runs only on failure. Unless `T` is `void`, every path must leave with `return`/`break`/`continue` (E132).
   - `e recover as err run { ... }`: same rules, with the error bound as `err`. Inside it you can use `err.message`, `err == Type::Variant` (variant only) and `compare err { ... otherwise: }`. If every possible error is a bare `error X;`, this form is E016.
 - **Inside a recover block,** `return` returns from the **enclosing function** and is checked against *its* return type (E064). `break`/`continue` act on the enclosing loop.
-- **Precedence:** `recover` binds looser than every operator: `1 + (f() recover produce 0)`.
+- **Precedence:** `recover` binds looser than every operator, `=` and `+=` too: `1 + (f() recover produce 0)`, `v = (f() recover run { ... });`. Unparenthesized `v = f() recover ...` is `(v = f()) recover ...` (E066). A declaration initializer needs no parentheses.
 - **`try e`:** evaluates to the success value; on failure it returns the same error (same variant, payload and message) from the enclosing function, running pending defers.
   - The enclosing function must return `!V` for some `V` (any `V`).
   - E095 in `main`, in plain-returning functions, in `defer`, and on non-fallible operands.
@@ -496,6 +496,7 @@ fn main(): int {
 - **Inference only:**
   - For functions, type arguments are inferred from the arguments. Every type parameter must appear in the parameter list (`fn<T> make(): T` is E129). Arguments must agree exactly, with no widening (`pair(1, 2.5)` is E056).
   - For generic structs, type arguments come from the declared type of the destination (variable, field, parameter, return, element).
+  - **Size parameters:** `fn<T, N: size> fill(value: T): T[N] { mut r: T[N]; for i in 0..N { r[i] = value; } return r; }`. `N` is an array length that reads as an `int` in the body and is a free-function-only parameter. A call gets `N` from an array argument (`reversed(a)`) or else from the type the result goes into: a written declaration type, an assignment target, a non-generic parameter, a `return` with a written return type (`mut z: int[8] = fill(0);`). Nothing gives `N` (`mut d = fill(0);`, a bare `fill(0);`): E129. `N` on a struct, method or operator, `N` used as a type, a same-named value parameter, or `N = 3` / `N++` / `&N`: E150. Copy it to change it: `mut n: int = N;`.
   - **Never write `f<int>(x)` or `S<int>::default()`** (E110).
   - Generic types without arguments are E138; the wrong argument count is E148.
 - **No constraints or traits:** the body may use any operation; the instantiation fails at your call site if `T` lacks it. The error is the normal code (E124, E057, E068, E131), with `Note:` lines showing the instantiation chain. To accept types without an operation, take a function parameter.
@@ -529,8 +530,9 @@ fn main(): int {
   - A `mut` view of an `immut` array is E144. A slice is not an assignment target (E061).
   - Strings and `List` cannot be sliced (E142); use `strings::substring`.
   - A `T[]` cannot become a `T[N]` (E003/E056).
-- **`a.copy()`:** an independent GC-backed `T[]`. `length()` and `copy()` are the only built-in array methods. The prelude `array` module adds `sum/max/min/contains/index_of(arr, len[, val])` for `int`, `double` and `string` arrays.
-- **Arrays of references:** `(&Node)[N]` must be initialized (E128). `(&?Node)[N]` starts all-null. Function-value arrays: `(fn(int): int)[N]`.
+- **`a.copy()`:** an independent GC-backed `T[]`. `length()` and `copy()` are the only built-in array methods. The prelude `array` module adds `sum/max/min/contains/index_of(arr, len[, val])` for `int`, `double` and `string` arrays. To build a whole array use the (non-prelude) `arrays` module: `import arrays;` `arrays::fill/generate/reversed/map` (see stdlib.md).
+- **Zero fill:** `mut a: int[N];` reads as zeros (`0`, `0.0`, `false`, `""`, `null`, zeroed structs) until written; no initializer needed.
+- **Arrays of references:** `(&Node)[N]` must be initialized (E128). `(&?Node)[N]` starts all-null. An array literal of `null`s (`[null, null]`) or of `&n` takes a `(&?Node)[N]` type in an assignment, argument, `return` or field value, not only a declaration. Function-value arrays: `(fn(int): int)[N]`.
 
 ## 16. References and memory
 

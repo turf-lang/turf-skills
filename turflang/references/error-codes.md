@@ -1,6 +1,6 @@
 # Turf error-code index
 
-Turf compiler diagnostics carry stable identifiers `E001` through `E149`: a code is never reassigned, and retired codes are kept so old logs still resolve. The code appears in the diagnostic header, for example `── error at line 4, col 18 [E001 · array error]`, as `[E0NN · category]`. Run `turf explain E0NN` (or `turfc --explain E0NN`) to print the full page: what it means, a wrong example and the fix. Below, codes are grouped by category (the compiler's `SLM::ErrorCategory`, shown as `UPPER_CASE`; the diagnostic header prints it lowercased with spaces). "Class name" is the compiler's error class for the code. Rows marked "Warning" do not stop compilation. 143 codes are active; 6 are retired (see the retired table). Facts come from `docs/errors/codes/E0NN.txt`; class names and categories come from `src/diagnostics/ErrorCodes.h`, because the code pages themselves carry no header.
+Turf compiler diagnostics carry stable identifiers `E001` through `E150`: a code is never reassigned, and retired codes are kept so old logs still resolve. The code appears in the diagnostic header, for example `── error at line 4, col 18 [E001 · array error]`, as `[E0NN · category]`. Run `turf explain E0NN` (or `turfc --explain E0NN`) to print the full page: what it means, a wrong example and the fix. Below, codes are grouped by category (the compiler's `SLM::ErrorCategory`, shown as `UPPER_CASE`; the diagnostic header prints it lowercased with spaces). "Class name" is the compiler's error class for the code. Rows marked "Warning" do not stop compilation. 144 codes are active; 6 are retired (see the retired table). Facts come from `docs/errors/codes/E0NN.txt`; class names and categories come from `src/diagnostics/ErrorCodes.h`, because the code pages themselves carry no header.
 
 ## TYPE_MISMATCH (Type mismatch)
 
@@ -24,7 +24,7 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E149`: a code
 
 | Code | Class name | What triggers it | Usual fix |
 |---|---|---|---|
-| E008 | DefiniteAssignmentError | Variable declared without value is read on a path where it may be unassigned (`if` with no `else`). | Initialize at declaration (`mut x: int = 0;`) or assign in every branch. |
+| E008 | DefiniteAssignmentError | Scalar/struct declared without value is read on a path where it may be unassigned (`if` with no `else`). Never for a fixed-size `T[N]`, which is zero-filled from its declaration. | Initialize at declaration (`mut x: int = 0;`) or assign in every branch. |
 | E040 | ReferenceError | Name used as a value is not declared anywhere (typo, undeclared, or a type name used as value). | Fix spelling, declare with `mut`/`immut` first, or build a value with `Node::default()`. |
 | E041 | UnknownFunctionError | Called function name unknown: typo, missing module import, or constructor-call syntax `Node(5)`. | Fix spelling, `import` its module, or use `Node::new(5)` / `Node::default()`. |
 | E043 | UseBeforeDeclarationError | Variable used above the line that declares it in the same block. | Move the `mut`/`immut` declaration before first use. |
@@ -119,6 +119,7 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E149`: a code
 | E021 | ExportMutNotSupportedError | `export mut` used; only constants can be exported. | Use `export immut NAME: T = value;`, or keep it local and add getter/setter functions. |
 | E022 | ExportNonConstantInitializerError | `export immut` initializer is not a literal (expression) or is missing. | Write the literal value: `export immut total: int = 20;`. |
 | E023 | ExportOutsideTopLevelError | `export` written inside a function body. | Move to top level, or drop `export` for a local `immut`. |
+| E150 | SizeParameterError | Size parameter `N: size` on a struct, method or operator; a kind other than `size`; `N` used as a type; a value parameter named `N`; `N` assigned (`N = 3`, `N++`, `&N`). | Free generic functions only: `fn<T, N: size> f(a: T[N])`; use `N` as a length (`0..N`, `T[N]`); copy first: `mut n: int = N;`. |
 | E024 | ImportSymbolCollisionError | Two `import mod::name;` bring in the same bare name. | Qualify calls (`shapes::area(...)`) or narrow with `import geometry::[perimeter];`. |
 | E027 | ModuleNotFoundError | `import name;` finds no `name.tr` in stdlib or project. | Fix the module name (`import strings;`, not `strnigs`) or create/rename the file. |
 | E028 | OperatorBuiltinPairError | `operator` overload where both operands are builtin types (`int`, `string`, ...). | Make one operand your struct type, or delete it and use the builtin operator. |
@@ -159,8 +160,8 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E149`: a code
 | E116 | ExternFunctionBodyError | `extern fn` written with a `{ ... }` body. | End with a semicolon: `extern fn malloc(size: int): ptr;`, or drop `extern` to define it. |
 | E117 | InvalidErrorDeclarationError | `error` declaration mixing bare `;` form with a `{ ... }` variant list. | Pick one: `error NotFound;` or `error IOError { NotFound, Closed }`. |
 | E119 | MissingEntryPointError | No `main` function in the compiled file (missing, misspelled, or file is a module). | Define `fn main(): int { return 0; }`; for a module use `turf check --module file.tr`. |
-| E128 | MissingInitializerError | `immutable` without value, or `guess` without initializer or in parameter, return type or field. | Give a value: `mut x: guess = 5;`; otherwise write the type: `mut x: int;`. |
-| E129 | NothingToInferError | `guess` initializer has no usable type (`null`, void call, `List::default()`), or generic `T` unused in parameters. | State the type: `mut a: &?Point = null;`, `List<int>`; use `T` in a parameter. |
+| E128 | MissingInitializerError | `immutable` without value, or `guess` without initializer or in parameter, return type or field; also an array of non-null references `(&T)[N]` or an unsized local `T[]` with no initializer. | Give a value: `mut x: guess = 5;`; otherwise write the type: `mut x: int;`. |
+| E129 | NothingToInferError | `guess` initializer has no usable type (`null`, void call, `List::default()`), or generic `T` unused in parameters; or a size parameter `N` that no array argument or target type fixes (`mut d = fill(0);`). | State the type: `mut a: &?Point = null;`, `List<int>`, `mut d: int[4] = fill(0);`; use `T` in a parameter. |
 | E136 | InvalidModuleQualifierError | Two module names in a row, e.g. `mem::io::printline`. | Use the module that has the function: `io::printline("hi")`. |
 | E138 | MissingTypeArgumentsError | Generic type used without type arguments, e.g. `mut b: Box = ...`. | Give type arguments: `Box<int>`; methods of generic structs repeat parameters: `fn<T> Box.get(): T`. |
 | E145 | ModuleNotImportedError | `module::name` spelled in a file that never imported the module itself. | Add the exact import the error prints, e.g. `import list;`; `import list::List;` does not allow `list::List`. |
@@ -374,6 +375,7 @@ immutable PI: double;
 // right
 mut x: guess = 5;   // or: mut x: int; x = 5;
 immutable PI: double = 3.14159;
+// also E128: mut refs: (&Node)[3];   // needs an initializer; (&?Node)[3] and int[3] do not
 ```
 
 ### E129 NothingToInferError: Nothing to infer a type from

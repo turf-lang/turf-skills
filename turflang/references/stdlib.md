@@ -5,7 +5,7 @@ Lookup reference. Signatures are copied from `docs/reference/stdlib/*.md` and ch
 ## Conventions
 
 - **Prelude (no import):** `int double bool char strings array` (methods/operators/`strings::x`, `array::x` only; bare `is_digit(c)` is E041) and `io math sys` (every public function also callable bare: `printline`, `abs`, `max`, `sqrt`, `exit`, `panic`). Constants stay qualified (`math::PI`). A user function with the same name hides the prelude's bare name; `math::max` still reaches it.
-- **Need import:** `list stack queue map set hashing net fs os time random mem json http test`.
+- **Need import:** `arrays list stack queue map set hashing net fs os time random mem json http test`.
 - **Import forms:** `import list::List;` lets you write `List<int>` (not `list::List`); `import list;` lets you write `list::List<int>` (not `List`). Need both spellings => write both imports. Non-generic modules: `import fs;` then `fs::mkdir(...)`.
 - **Naming:** functions/methods/fields `snake_case`; types `PascalCase`; constants `UPPER_CASE`. One spelling per name, no aliases.
 - **Failure convention:**
@@ -127,6 +127,39 @@ Every function takes `len: int` after the array and looks at the first `len` ele
 | `index_of(arr: int[], len: int, val: int): int` (also `double[]`, `string[]`) | first index or `-1` |
 
 Slices are arrays: `ints[1..4].sum(3)`.
+
+## arrays   (`import arrays;`; qualified calls only; NOT the prelude `array` above)
+
+Builds whole fixed-size arrays. Each returns a new `T[N]` and changes nothing it is given. `N` is never written: it comes from an array argument, or from the type the result is stored into (written declaration type, assignment target, non-generic parameter, `return` with a written return type); otherwise E129 (`mut w = arrays::fill(0);`). Wrong target type is E004.
+
+| Signature | Notes |
+|---|---|
+| `fill(value: T): T[N]` | `N` copies of `value`; `T` needs a zero value (not `&T`: `(&Node)[2]` is E128; use a `(&?Node)[N]` from a `&?Node`) |
+| `generate(f: fn(int): T): T[N]` | `f(0)`, ..., `f(N - 1)` |
+| `reversed(a: T[N]): T[N]` | last element first |
+| `map(a: T[N], f: fn(T): U): U[N]` | same length, element type may change |
+
+```turflang
+import arrays;
+import io;
+
+fn square(i: int): int {
+    return i * i;
+}
+
+fn label(i: int): string {
+    return "n" + (i to string);
+}
+
+fn main(): int {
+    mut zeros: int[1000] = arrays::fill(0);
+    mut sq: int[5] = arrays::generate(square);
+    mut back: int[5] = arrays::reversed(sq);
+    mut texts: string[5] = arrays::map(sq, label);
+    io::printline(back[0] + zeros[999]);   // 16
+    return 0;
+}
+```
 
 ---
 
