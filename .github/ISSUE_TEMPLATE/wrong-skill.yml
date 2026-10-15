@@ -1,0 +1,43 @@
+name: "Wrong or outdated skill"
+description: "A skill tells an agent something that is false for the current Turf"
+title: "[SKILLS] "
+type: Bug
+labels: []
+body:
+  - type: input
+    id: skill
+    attributes:
+      label: Skill
+      description: Which skill file.
+      placeholder: skills/turf-syntax/SKILL.md
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What it says
+      description: The incorrect or outdated guidance.
+    validations:
+      required: true
+  - type: textarea
+    id: right
+    attributes:
+      label: What is true
+      description: What Turf does, ideally with a program that compiles.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `turf --version` (or `turfc --version`).
+      placeholder: 2.1.0
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the open and closed issues and found no duplicate.
+          required: true
