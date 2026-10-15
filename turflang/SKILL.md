@@ -27,24 +27,32 @@ Turf 2.0: static types, ahead-of-time compiled through LLVM, garbage-collected h
 1. **Find the toolchain.** Run `turf version`: it prints both `turf` (the front end) and `turfc` (the compiler), plus the install root and whether `smart` is built in. `turf file.tr [flags]` is the same as `turfc file.tr [flags]`. If `turf` is missing or stale, call `turfc` directly. Every single-file flag below works on both.
 2. **Write the code** following the rules below. Put small, checkable pieces in their own functions.
 3. **Check without building:** `turf check file.tr` (or `turfc --check file.tr`). Use `--module` for a file that has no `main` and is only imported. In a project, run `turf check` with no file.
-4. **Read every diagnostic and fix it**: start with the first one, consult `references/diagnostics.md`, and run `turf explain E0NN` when the message is not enough. Re-check after each round. Errors come in stages: until the syntax errors are fixed, type errors are not reported at all. Expect several rounds; that is normal, not a sign you are lost.
-5. **Use `--smart` when you are stuck on an error** and the smart build plus a model are installed (see below). Treat its output as a suggestion that has already been verified, not as gospel.
+4. **Read every diagnostic and fix it**: start with the first one. **If it ends with a `Fix:` block, apply that edit**: the compiler has already checked it. Otherwise consult `references/diagnostics.md`, and run `turf explain E0NN` when the message is not enough. Re-check after each round. Errors come in stages: until the syntax errors are fixed, type errors are not reported at all. Expect several rounds; that is normal, not a sign you are lost.
+5. **Use `--smart` when you are stuck on an error that has no `Fix:`** and the smart build plus a model are installed (see below). Treat its output as a suggestion that has already been verified, not as gospel.
 6. **Build and run:** `turf run file.tr` (or `turf file.tr -o prog && ./prog`). In a project, run `turf build`, `turf run` and `turf test`.
 7. **Read runtime panics.** They name the file and line (`panic: runtime check: Array index out of bounds for 'a' (prog.tr:7)`, exit status 134). Fix the cause; there is nothing to catch.
 8. **Format before committing:** `turf fmt --write <files or dirs>`. It only fixes indentation and whitespace, never re-spaces code.
 
 Exit statuses: 0 means success, 1 means a reported problem (compile error, failed test), 2 means a bad command line. `turf run` returns the program's own status, and 134 means a panic.
 
-### Deterministic diagnostics vs `--smart`
+### Compiler fixes, diagnostics and `--smart`
 
 * **The compiler's own diagnostics are the source of truth** and need nothing extra. Each one has a stable code `[E0NN · category]`, a plain-language message, `Note:` lines pointing at related places, often a `Hint:` with the exact fix, and a caret under the offending token. "Did you mean" hints for misspelled names are reliable: they come from edit distance over names actually in scope.
-* **`--smart`** (`turf file.tr --smart`) sends the *first* error to a small local language model (llama.cpp, no network). Any suggested fix is applied to an isolated sandbox copy and kept **only if the error disappears and no new error appears**. Otherwise you see the normal diagnostic, unchanged. Up to 3 attempts, each retried with compiler feedback.
-  * An error with a single unambiguous fix (an exact "did you mean" rename, a missing `;`, a generic method's missing `<T>`) is fixed **deterministically, without calling the model**: `[Deterministic Fix] ✓ 'countr' -> 'counter' validated -- the model was never called.`
-  * Output appears inside the diagnostic as `[AI Suggestion]`, with `Explanation:` and a `- line / + line` diff.
+* **A `Fix:` block is a compiler-checked edit** (TurfLang 2.1.0 and later, every build, no flag, no model). When an error has exactly one right edit, the diagnostic ends with it:
+  ```text
+    Fix: replace 'countr' with 'counter'
+    3 │     counter += 1;
+      │     ~~~~~~~
+  ```
+  Before printing it, the compiler applied the edit to a copy of the program and checked it again: the error is gone and no new error appeared. **Apply it as written**, then re-check. It covers a misspelled name with one close match (variable, function, method, field, type, enum variant, module symbol, keyword), `.` vs `::`, a stray `static` or `pub`, `immut` → `mut` at the declaration of a variable you assign to, a missing `;` and a generic method's missing `<T>`. No `Fix:` means more than one edit is plausible: the `Hint:` names the candidates, and you choose.
+  * It never edits your source. `--smart-write-fix=<path>` (any build, with `turf check`, `turf file.tr` or `turfc`) writes the whole program with every shown `Fix:` applied to `<path>`; diff it and copy it over.
+  * Compiles is not the same as correct: a rename to the one close name is almost always the intent, but check it when two variables have similar names.
+* **`--smart`** (`turf file.tr --smart`) is for an error **without** a `Fix:`. When the compiler has a fix, `--smart` shows that and never calls the model. Otherwise it sends the *first* error to a small local language model (llama.cpp, no network). Any suggested fix is applied to an isolated sandbox copy and kept **only if the error disappears and no new error appears**. Otherwise you see the normal diagnostic, unchanged. Up to 3 attempts, each retried with compiler feedback.
+  * Output appears inside the diagnostic as `[Model Suggestion]`, with `Explanation:` and a `- line / + line` diff.
   * **It never edits your source.** Apply the diff yourself, or pass `--smart-write-fix=<path>` to write the whole patched file to `<path>`, then diff it against the original and copy it over if it is right.
   * It needs the smart build (`turfc --version` ends `smart built-in`) and **exactly one** `.gguf` file in `<root>/models/`. If either is missing, it prints a one-line note and falls back to the normal diagnostics. A model fix takes seconds to a minute or more, so do not put `--smart` in loops or CI.
   * The exit status is still 1, since the file on disk still has the error.
-  * Strategy: fix obvious errors yourself from the deterministic message. Reach for `--smart` when a message is unclear or two attempts of yours have failed. A validated suggestion is guaranteed to compile, **not** guaranteed to mean what you intended. Always check that the patch preserves the program's logic.
+  * Strategy: apply `Fix:` blocks, fix other obvious errors yourself from the message and hint. Reach for `--smart` when a message is unclear or two attempts of yours have failed. A validated model suggestion is guaranteed to compile, **not** guaranteed to mean what you intended. Always check that the patch preserves the program's logic.
 
 ## Core syntax at a glance
 
@@ -216,7 +224,7 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
 ## Fixing bugs in existing Turf code
 
 1. Reproduce: `turf check` for compile errors, `turf run` for behaviour. For runtime panics, the message names `file:line`. Debug with `-O0 -g` plus `gdb`/`lldb` (breakpoints by `file.tr:line`, locals by name), or add `printline` / `io::eprintline` traces (stdout is flushed before a panic message).
-2. Read the diagnostic's Hint and Notes. For generic code, the Notes list the instantiation chain from your call down to the failing line inside the library.
+2. Read the diagnostic's `Fix:` (apply it), Hint and Notes. For generic code, the Notes list the instantiation chain from your call down to the failing line inside the library.
 3. Fix the root cause rather than silencing the symptom. **There are no flags to disable checks or warnings**; the only way to silence a warning is to fix what it points at. Prefix intentionally unused variables with `_`.
 4. Add a regression test (`tests/<name>.tr` that exits 0, or a `fail_<name>.tr` with `// EXPECT-DIAG: E0NN` for "must not compile"). See `references/projects-and-testing.md`.
 
@@ -243,6 +251,7 @@ turf fmt --write|--check [paths]  indentation/whitespace only
 turf explain E0NN              long explanation of an error code
 turf dump ast|resolved|typechecked|modules|symbols|instantiations file.tr
 turf file.tr -o out [-O0..-O3|-Os] [-g] [--emit-llvm] [--emit-obj] [--link lib]
+turf check file.tr --smart-write-fix=fixed.tr   (write the program with every Fix: applied)
 turf file.tr --smart [--smart-write-fix=fixed.tr]
 turf add NAME --path ../x | --git URL --tag v1   (project dependencies)
 turf migrate pub [--write] mod.tr   (1.x → 2.0: add pub)

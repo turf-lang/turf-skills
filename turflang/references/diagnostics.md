@@ -10,7 +10,7 @@ turf check --module lib.tr    # a file with no main that is only imported
 turf check                    # in a project: every module + main
 ```
 
-1. Fix the **first** error of each file first. Later errors are often consequences of it, although the compiler already drops repeated diagnostics on the same line.
+1. **Apply every `Fix:` block** (section 2): the compiler has already checked each one. Then fix the **first** remaining error of each file first. Later errors are often consequences of it, although the compiler already drops repeated diagnostics on the same line.
 2. **Errors arrive in phases:** lexing/parsing → name resolution → type checking → flow analysis (missing returns, definite assignment, escapes, unreachable code). A file with a syntax error does not report its type errors yet. Expect new errors after each round; that is progress.
 3. When the one-line message is not enough, `turf explain E0NN` prints the full page with a wrong example and its fix. Run it before patching any code whose footer says `Worth reading in full`: E010, E017, E018, E035, E036, E069, E086, E088, E089, E121, E130.
 4. **E121 is an internal compiler error.** It is not your bug. Simplify the construct, work around it, and report it.
@@ -35,10 +35,30 @@ prog.tr (1 error)                                   ← file header: path + coun
   Run `turf --explain E057` for more details.
 ```
 
+An error with exactly one right edit also ends with a `Fix:` block (TurfLang 2.1.0 and later, every build, no flag):
+
+```text
+── error at line 3, col 5 [E040 · undeclared variable]
+
+  I can't find anything named 'countr'.
+
+  Hint: It may be from the current file: 'counter'
+
+  3 │     countr += 1;
+    │     ^~~~~~ Here!
+
+  Fix: replace 'countr' with 'counter'              ← the edit, in words
+  3 │     counter += 1;                               ← the line as it reads after it
+    │     ~~~~~~~                                     ← the text the edit wrote
+
+  Run `turf --explain E040` for more details.
+```
+
 - **Categories:** type mismatch, undeclared variable, control flow, syntax error, arithmetic, string conversion, array error, declaration, function signature, builtin function, memory error, general.
 - **Ordering:** files come in compile order (your file, then imported modules). Within a file, diagnostics are sorted by position. Paths are relative to where you ran the command.
 - **Warnings** have the same shape, but often no code.
 - **Stdlib warnings** are hidden unless you pass `--stdlib-warnings`. Errors are never hidden.
+- **`Fix:` blocks** are checked before they are printed: the compiler applied the edit to a copy of the program, analysed it again, and the error was gone with no new error. Apply them as written. Wordings: `replace 'a' with 'b'`, `remove 'pub'`, `insert ';' at the end of line N`, `insert '<T>' after 'fn'`, `move 'pub' to just before 'fn'`. They exist for a misspelled name with **one** close match (variable, function, method, field, type, variant, module symbol, scope qualifier, keyword), `x::m` on an instance, `Type.m` on a type, a static method called through an instance, `static` on a constructor, a misplaced `pub`, assigning to an `immut` variable (its declaration becomes `mut`), a missing `;` and a generic struct's method without `<T>`. No `Fix:` means several edits are plausible; the hint lists them. `--smart-write-fix=<path>` writes the whole program with every shown `Fix:` applied, in any build.
 - **"Did you mean" hints** (`Hint: It may be from the current file: 'counter'`) are edit-distance matches against names actually in scope. They are reliable for typos.
 - **Errors inside generic code** are anchored at *your* call line. The `Note:` lines list the instantiation chain (`'Set<Big>.add' requires 'Set<Big>.contains' here ...`) down to the failing operation inside the library. Read them top to bottom. The fix is almost always on your side: give your type the operation it needs (typically `operator ==`) or pass a comparator.
 
@@ -46,7 +66,7 @@ prog.tr (1 error)                                   ← file header: path + coun
 
 | You see | It usually means | Do |
 |---|---|---|
-| `I can't find anything named 'x'` (E040) | typo, out of scope (declared inside a block or loop), or never declared | take the hint; declare with `mut`/`immut` |
+| `I can't find anything named 'x'` (E040) | typo, out of scope (declared inside a block or loop), or never declared | apply the `Fix:` if there is one; else take the hint, or declare with `mut`/`immut` |
 | `Unknown function` (E041) | typo; prelude function called bare when it is not `io`/`math`/`sys` (`is_digit(c)`); missing `import test;` for `assert` | use the method form `c.is_digit()`, qualify it, or import |
 | `Module 'm' has no function named 'f'` (E026) | wrong name for a stdlib function | check `stdlib.md` |
 | `Module 'm' is not imported in this file` (E145) | wrote `m::x` without `import m;` | add `import m;` |
@@ -81,16 +101,12 @@ turfc --check prog.tr --smart               # works with --check too
 
 1. The compile runs normally. A clean compile never starts the model, and warnings never trigger it.
 2. On error, only the **first** error is handled.
-3. **Deterministic layer first.** If the diagnostic already carries an exact edit (an unambiguous "did you mean" rename, a missing `;`, a missing `<T>` on a generic method), that edit is applied to a sandbox copy and validated. The model is never called, and it takes milliseconds:
-   ```text
-   [Sandbox] ✓ Fix validated and committed
-   [Deterministic Fix] ✓ 'countr' -> 'counter' validated -- the model was never called.
-   ```
+3. **The compiler's own fix first.** If the error has a `Fix:` (section 2), `--smart` shows it and the model is never called. It takes milliseconds, and the output is the same as without `--smart`.
 4. **Otherwise, the local model** (llama.cpp, CPU/Metal, no network) is prompted with the error, its category, the surrounding code and a Turf syntax card. Its proposed edit is applied to an **isolated sandbox copy** and recompiled.
 5. **Validation rule:** the suggestion is shown only if the original error is gone **and no new error appears**. A failed attempt is retried with the compiler's feedback, up to 3 attempts (`[Sandbox] Attempt 1/3 failed validation, retrying...`). If none validates, you get the plain diagnostic, unchanged.
 6. **Output** appears inside the diagnostic:
    ```text
-   [AI Suggestion]  ...
+   [Model Suggestion]  ...
    Explanation: ...
    Suggested fix:
      - 4 |     mut label: string = "x=" + p.x;
@@ -101,11 +117,11 @@ turfc --check prog.tr --smart               # works with --check too
 **Requirements:**
 - the smart build (`turfc --version` → `smart built-in`, from the `-smart` release archive or a source build without `--no-smart`);
 - exactly one `.gguf` model in `<root>/models/` (`<root>` is the `root` line of `turf version`; e.g. `~/.turf/models`). `qwen2.5-coder-1.5b-instruct-q4_k_m.gguf` is the development model.
-- With zero or several models, or the plain build, you get a one-line `note:` and the normal diagnostics.
+- With zero or several models, or the plain build, you get a one-line `note:` and the normal diagnostics. `Fix:` blocks need none of this.
 
 **How an agent should use it:**
-- **Default to the deterministic diagnostics.** They are exact, instant and usually include the fix in the Hint.
-- **Use `--smart`** when:
+- **Default to the compiler's diagnostics.** Apply `Fix:` blocks; for the rest, the message and Hint are exact, instant and usually name the fix.
+- **Use `--smart`** for an error with no `Fix:`, when:
   - a message is unclear to you;
   - your own two attempts at an error failed;
   - you are learning an unfamiliar construct and want to see the idiomatic fix.

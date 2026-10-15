@@ -115,6 +115,7 @@ A test is a **whole program** in `tests/` (any depth). One file is one test, and
 | `// EXPECT-DIAG: E066` | compiler output contains that code |
 | `// EXPECT-DIAG: some text` | ... or that text (warnings have no code) |
 | `// EXPECT-NO-DIAG: warning` | output must NOT contain the text (keeps a library warning-free) |
+| `// EXPECT-FIX: replace 'nmae' with 'name'` | the compiler printed exactly that `Fix:` line (2.1.0+); the runner also applies the printed fixes and checks the fixed program has fewer errors and none new. Optional: a test without it is unaffected by fixes |
 | `// EXPECT-RUNTIME: msg` | the aborting program printed `msg` (pin the part after `file:line:`) |
 | `// EXPECT-EXIT: 134` | the aborting program's exit status |
 
