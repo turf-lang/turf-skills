@@ -85,9 +85,10 @@ An error with exactly one right edit also ends with a `Fix:` block (TurfLang 2.1
 | `Writing into part of an index result` (E098) | `list[i].f = v`, `m[k][j] = v` | read, modify, write back |
 | `Raw pointer ... outside an 'unsafe' block` (E130) | pointer types or casts outside `unsafe`, or in a function signature | use `&T`/`&?T`; wrap the FFI in `unsafe { }` |
 | `Expected ...` / `Unexpected token` (E102, E103, E107, E108, E110) | syntax: missing `;`, `{`, `:` return type, a reserved word as a name (`step`, `float`, `guess`, ...), `f<int>(x)`, `/* */` comment | see `error-codes.md` |
-| `Missing type parameters!` (E138) | `fn Box.get()` on a generic struct, or a type used without its arguments | `fn<T> Box.get()`, `Box<int>` |
+| `Missing type parameters!` (E138) | `fn Box.get()` on a generic struct, a type used without its arguments, or `Box::default().get()` | `fn<T> Box.get()`, `Box<int>`, declare `mut b: Box<int> = Box::default();` first |
 | `Nothing to infer!` (E129) | `mut l = List::default();`; a size parameter no array argument or target type gives (`mut d = fill(0);`) | `mut l: List<int> = List::default();`; `mut d: int[4] = fill(0);` |
 | E150 | size parameter (`N: size`) on a struct/method/operator, used as a type, or assigned | free function only; copy it first: `mut n: int = N;` |
+| E151 | `struct Box<T>` declared inside a function | move it to the top level, or drop `<T>` and use concrete field types |
 | `No entry point found` (E119) | checked a module as a program | add `--module`, or write `fn main(): int` |
 
 ## 4. `--smart`: model-assisted fixes

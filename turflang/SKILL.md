@@ -1,6 +1,6 @@
 ---
 name: turflang
-description: Write, read, debug, fix, test and port code in TurfLang (Turf), the statically typed LLVM-compiled language with `.tr` files, `turf`/`turfc` compilers, `turf.toml` projects and the `--smart` local-model diagnostics. Use whenever a task touches `.tr` files, Turf syntax, Turf compile errors (E001–E150), runtime panics, the Turf standard library, `turf test`, or rewriting code into or out of Turf.
+description: Write, read, debug, fix, test and port code in TurfLang (Turf), the statically typed LLVM-compiled language with `.tr` files, `turf`/`turfc` compilers, `turf.toml` projects and the `--smart` local-model diagnostics. Use whenever a task touches `.tr` files, Turf syntax, Turf compile errors (E001–E151), runtime panics, the Turf standard library, `turf test`, or rewriting code into or out of Turf.
 ---
 
 # TurfLang

@@ -48,7 +48,7 @@ SKILL.md                         workflow, core syntax, the traps
 references/language.md           full language rules (condensed reference)
 references/stdlib.md             every stdlib module and signature
 references/diagnostics.md        fix loop, diagnostic anatomy, --smart, runtime panics
-references/error-codes.md        E001–E150: trigger and usual fix
+references/error-codes.md        E001–E151: trigger and usual fix
 references/projects-and-testing.md  turf.toml, modules, packages, turf test
 references/porting.md            idiom map from other languages, 1.x → 2.0
 examples/*.tr                    complete programs (compiled and run)

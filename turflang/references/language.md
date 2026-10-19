@@ -413,7 +413,7 @@ fn main(): int {
 - **Value semantics:** assignment, parameters and returns copy the struct, nested structs and fixed arrays included. Collection fields are handles, so the copy shares them.
 - **Comparison:** `==` is undefined unless you declare `operator ==` (E124).
 - **No by-value self-containment** (E069): use `&?T` for links. A cycle through `&T` fields has no default (E147).
-- **Local types:** structs, enums, machines and errors may be declared inside a function body. They have no methods, and names must be unique per file.
+- **Local types:** structs, enums, machines and errors may be declared inside a function body. They have no methods, a local struct can't be generic (E151), and names must be unique per file.
 
 ## 11. Enums
 
