@@ -1,6 +1,6 @@
 # Turf error-code index
 
-Turf compiler diagnostics carry stable identifiers `E001` through `E151`: a code is never reassigned, and retired codes are kept so old logs still resolve. The code appears in the diagnostic header, for example `── error at line 4, col 18 [E001 · array error]`, as `[E0NN · category]`. Run `turf explain E0NN` (or `turfc --explain E0NN`) to print the full page: what it means, a wrong example and the fix. Below, codes are grouped by category (the compiler's `SLM::ErrorCategory`, shown as `UPPER_CASE`; the diagnostic header prints it lowercased with spaces). "Class name" is the compiler's error class for the code. Rows marked "Warning" do not stop compilation. 145 codes are active; 6 are retired (see the retired table). Facts come from `docs/errors/codes/E0NN.txt`; class names and categories come from `src/diagnostics/ErrorCodes.h`, because the code pages themselves carry no header.
+Turf compiler diagnostics carry stable identifiers `E001` through `E171`: a code is never reassigned, and retired codes are kept so old logs still resolve. The code appears in the diagnostic header, for example `── error at line 4, col 18 [E001 · array error]`, as `[E0NN · category]`. Run `turf explain E0NN` (or `turfc --explain E0NN`) to print the full page: what it means, a wrong example and the fix. Below, codes are grouped by category (the compiler's `SLM::ErrorCategory`, shown as `UPPER_CASE`; the diagnostic header prints it lowercased with spaces). "Class name" is the compiler's error class for the code. Rows marked "Warning" do not stop compilation by default; only a warning code has a lint level (`--allow E163`, `--warn E163`, `--deny E163`, or a `[lints]` table in `turf.toml`; see `diagnostics.md`), and a denied warning is an error. Every warning has a code and prints it in its header. 171 codes in all: 165 are active (23 of them warnings: E074, E075, E094 and E152-E171); 6 are retired (see the retired table). Facts come from `docs/errors/codes/E0NN.txt`; class names and categories come from `src/diagnostics/ErrorCodes.h`, because the code pages themselves carry no header.
 
 ## TYPE_MISMATCH (Type mismatch)
 
@@ -52,6 +52,19 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E151`: a code
 | E120 | InvalidLoopFormError | Unsupported `for` form, e.g. `for (i, x) in 0..10`. | Ranges take one variable; arrays take `for v in arr` or `for (i, v) in arr`. |
 | E132 | InvalidRecoverError | `recover` on a call that can't fail, or `recover run { }` block that does not `return`. | Drop `recover` or declare `fn f(): !int`; end the block with `return` or use `recover produce <v>`. |
 | E133 | DuplicateMatchArmError | Same value matched twice in one `compare`. | Change the duplicate value, delete the arm, or stack headers to share one body. |
+| E154 | CompareWarning | Warning: a `compare` with no arms and no `otherwise`. | Add the arms you meant, or delete the empty `compare`. |
+| E155 | RedundantComparisonWarning | Warning: `x == true`, `x != false` (a bool compared with a bool literal). | Use the bool itself (`if ready`) or `!ready`. |
+| E157 | SuspiciousInfiniteLoopWarning | Warning: `while true` (or `do { } while true`) whose body has no `break`, `continue` or `return`. | Give the loop an exit, or put the condition in the loop header; allow it for a deliberate server loop. |
+| E158 | CyclomaticComplexityWarning | Warning: function with cyclomatic complexity above 15 (e.g. sixteen separate `if`s). | Turn the `if` chain into a `compare`, or split the function into helpers. |
+| E159 | InfiniteLoopWarning | Warning: a loop in a function whose control flow has no exit path (a `continue` hides it from E157). | Add a real `break` or `return`; allow it for a deliberate main loop. |
+| E160 | DeadStoreWarning | Warning: a value assigned to a variable and overwritten or dropped before anything reads it. | Delete the store, or make the next line read it (`total += 10;`); a `_name` is skipped. |
+| E161 | DeadInitializerWarning | Warning: a declaration's initial value that every path overwrites before any read (`mut r: int = 0; r = 5;`). | Declare without a value: `mut r: int;`. |
+| E162 | RangeNeverEndsWarning | Warning: `for i in 5..1` or a `step` that moves away from the end, both bounds constant. | Use a step that matches the direction (`step i--`). |
+| E163 | UnusedVariableWarning | Warning: a local declared and never read. | Delete it or use it; prefix an intentional one with `_`. |
+| E164 | StuckForLoopVariableWarning | Warning: neither the `step` nor the body changes the loop variable (`for i in 0..10 step j += 10`). | Make the step move the loop variable, or use `while`. |
+| E165 | EmptyBranchWarning | Warning: an `if`, `elseif` or `else` block with no statements. | Flip the condition so the work is in the `if`, or delete the empty `else`. |
+| E168 | IdenticalBranchesWarning | Warning: an `if` and its `else` with identical bodies. | Fix the copied branch, or drop the `if` and keep one body. |
+| E169 | NeverReturnsErrorWarning | Warning: function declared `: !T` that never returns an error and calls nothing that can fail. | Drop the `!`, or return an error on the failing path. |
 
 ## SYNTAX_ERROR (Syntax error)
 
@@ -87,6 +100,7 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E151`: a code
 | E077 | IntegerLiteralNotExactAsDoubleError | Large integer literal assigned to `double` cannot round-trip exactly. | Use `int`, or write an explicit float literal like `9223372036854775807.0`. |
 | E078 | FloatLiteralOverflowError | Float literal beyond `double` range, e.g. `1e400`. | Fix the exponent typo or pick a value that fits `double`. |
 | E127 | EnumValueOutOfRangeError | Literal number outside the enum's variant range, e.g. `7 to Color`. | Use the variant name `Color::Green`, or a number within the printed range. |
+| E167 | DivisionByZeroLiteralWarning | Warning: `/` or `%` with a literal `0` or `0.0` on the right (`n / 0`). | Use the real divisor; check `d == 0` first when it can be zero. |
 
 ## STRING_CONVERSION (String conversion)
 
@@ -169,6 +183,8 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E151`: a code
 | E146 | InvalidAnnotationError | Unknown `@annotation` or arguments not fitting the declaration (e.g. `@ffi` on non-extern). | Fix spelling (`@ownership`, `@ffi`, `@caller_location`), correct arguments, or remove it. |
 | E147 | DefaultThroughReferenceCycleError | `T::default()` on a type reaching itself through `&` fields, e.g. `next: &Node`. | Make a field `&?Node` (defaults to null), or build with `Node::new(...)`. |
 | E148 | WrongTypeArgumentCountError | Wrong number of type arguments, e.g. `Point<int>` or `Box<int, int>`. | Match the declaration: `Point`, `Box<int>`. |
+| E152 | ShadowingWarning | Warning: a variable declared with the name of one still in scope (`immut count` inside a block that sees an outer `count`). | Give the inner variable another name. |
+| E153 | UnreachableStateWarning | Warning: a `machine` state no `->` edge leads into (expected for the start state). | Add the missing edge, or allow the warning for a start state. |
 
 ## FUNCTION_SIGNATURE (Function signature)
 
@@ -192,6 +208,8 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E151`: a code
 | E081 | PossibleNullDereferenceError | Field or method use on a `&?T` not proven non-null. | Check first: `if b != null { return b.val; }`; copy fields/calls into a variable before checking. |
 | E086 | DanglingReferenceEscapeError | Reference to a local (`&n`) returned or stored where it outlives the function. | Copy to the heap: `return heap(n);`. |
 | E130 | RawPointerOutsideUnsafeError | Raw pointer (`ptr`, `int*`) used outside `unsafe`, in a non-extern signature, or reference cast. | Wrap in `unsafe { ... }`, or use `&T` / `&?T`; only `extern fn` may take raw pointers. |
+| E170 | PossibleUseAfterFreeWarning | Warning: a pointer used after `free` on some paths but not all (only `@ownership`-annotated allocators). | Use the pointer before any path releases it; release it once, at the end. |
+| E171 | PossibleDoubleFreeWarning | Warning: a pointer freed again after a release on some paths but not all. | Release the pointer on exactly one path. |
 
 ## GENERAL (General)
 
@@ -201,6 +219,8 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E151`: a code
 | E026 | ModuleMethodNotFoundError | Function name after `module::` not in that module, e.g. `io::pritn`. | Fix spelling (message suggests `printline`) or call it from the module that declares it. |
 | E121 | InternalCompilerError | Compiler bug: internal state that earlier checks should rule out. | Report with minimal repro and `turf --version`; try naming intermediates with `mut` or adding type annotations. |
 | E122 | NonAddressableExpressionError | `&` applied to a temporary such as `&(x + 1)` or `&compute()`. | Store it first: `mut tmp: int = x + 1; mut r: &int = &tmp;`. |
+| E156 | SelfAssignmentWarning | Warning: `total = total;`. | Write the assignment you meant (`total = total + 1;`) or delete the line. |
+| E166 | SelfComparisonWarning | Warning: `a == a`, `a < a` and the like (an `x != x` NaN test is the one deliberate use). | Compare with the variable you meant. |
 
 ## Retired codes
 

@@ -14,7 +14,7 @@ turf check                    # in a project: every module + main
 2. **Errors arrive in phases:** lexing/parsing → name resolution → type checking → flow analysis (missing returns, definite assignment, escapes, unreachable code). A file with a syntax error does not report its type errors yet. Expect new errors after each round; that is progress.
 3. When the one-line message is not enough, `turf explain E0NN` prints the full page with a wrong example and its fix. Run it before patching any code whose footer says `Worth reading in full`: E010, E017, E018, E035, E036, E069, E086, E088, E089, E121, E130.
 4. **E121 is an internal compiler error.** It is not your bug. Simplify the construct, work around it, and report it.
-5. Re-check until it is clean. Warnings do not fail the build (exit status 0), but fix them anyway. There is no way to silence a warning except fixing it or prefixing an intentionally unused name with `_`.
+5. Re-check until it is clean. Warnings do not fail the build by default (exit status 0), but fix them anyway. To change how the build treats one warning, give its code a lint level (section 5): `--allow E163` hides it, `--deny E163` makes it an error. A name starting with `_` is the convention for an intentionally unused variable.
 
 ## 2. Anatomy of a diagnostic
 
@@ -56,7 +56,7 @@ An error with exactly one right edit also ends with a `Fix:` block (TurfLang 2.1
 
 - **Categories:** type mismatch, undeclared variable, control flow, syntax error, arithmetic, string conversion, array error, declaration, function signature, builtin function, memory error, general.
 - **Ordering:** files come in compile order (your file, then imported modules). Within a file, diagnostics are sorted by position. Paths are relative to where you ran the command.
-- **Warnings** have the same shape, but often no code.
+- **Warnings** have the same shape and the same header with a code: `── warning at line 2, col 5 [E163 · control flow]`. Every warning has a code (E074, E075, E094, E152-E171), and the code is what a lint level names.
 - **Stdlib warnings** are hidden unless you pass `--stdlib-warnings`. Errors are never hidden.
 - **`Fix:` blocks** are checked before they are printed: the compiler applied the edit to a copy of the program, analysed it again, and the error was gone with no new error. Apply them as written. Wordings: `replace 'a' with 'b'`, `remove 'pub'`, `insert ';' at the end of line N`, `insert '<T>' after 'fn'`, `move 'pub' to just before 'fn'`. They exist for a misspelled name with **one** close match (variable, function, method, field, type, variant, module symbol, scope qualifier, keyword), `x::m` on an instance, `Type.m` on a type, a static method called through an instance, `static` on a constructor, a misplaced `pub`, assigning to an `immut` variable (its declaration becomes `mut`), a missing `;` and a generic struct's method without `<T>`. No `Fix:` means several edits are plausible; the hint lists them. `--smart-write-fix=<path>` writes the whole program with every shown `Fix:` applied, in any build.
 - **"Did you mean" hints** (`Hint: It may be from the current file: 'counter'`) are edit-distance matches against names actually in scope. They are reliable for typos.
@@ -140,13 +140,38 @@ turfc --check prog.tr --smart               # works with --check too
 | missing return on some path | E009 error |
 | read before assignment | E008 error |
 | `new` doesn't assign every field on every path | E049 error |
-| unused variable / dead store / initializer overwritten before any read ("initial value ... never read": declare `mut x: int;`) | warning (prefix `_` to mark intentional); none are reported falsely inside `recover run { }` blocks or for single-element array writes |
-| `while true` with no exit (a `break`/`return` inside `recover`, `compare` or `unsafe` counts as an exit) | warning ×3 (fine for a server loop) |
+| unused variable (E163) / dead store (E160) / initializer overwritten before any read (E161, "initial value ... never read": declare `mut x: int;`) | warning (prefix `_` to mark intentional); none are reported falsely inside `recover run { }` blocks or for single-element array writes |
+| `while true` with no exit (a `break`/`return` inside `recover`, `compare` or `unsafe` counts as an exit) | warning ×3: E157, E159 and E074 for the code after it (fine for a server loop) |
 | infinite self-recursion (every path recurses) | E010 error |
 | constant index out of bounds / bad constant slice | E001 / E143 error |
-| double free / use after free (only `@ownership`-annotated allocators) | E017/E018 error, warning on some paths |
-| cyclomatic complexity > 15 | warning |
-| `x / 0` literal, `k = k;`, `x == x`, shadowing, empty `then`, a `for` whose variable never changes, a range that never ends, a `!T` that never fails, a machine state with no incoming edge | warnings |
+| double free / use after free (only `@ownership`-annotated allocators) | E017/E018 error; E171/E170 warning on some paths |
+| cyclomatic complexity > 15 | E158 warning |
+| `x / 0` literal (E167), `k = k;` (E156), `x == x` (E166), `x == true` (E155), shadowing (E152), empty `then` (E165), identical `if`/`else` bodies (E168), empty `compare` (E154), a `for` whose variable never changes (E164), a range that never ends (E162), a `!T` that never fails (E169), a machine state with no incoming edge (E153) | warnings |
+
+### Lint levels
+
+Each warning code has a **level**: `allow` (not reported), `warn` (reported; the start for every warning) or `deny` (reported as an error: status 1, no program). The level is chosen by whoever builds the program; there is no source syntax for it.
+
+```text
+turf check prog.tr --deny E163          # fail on an unused variable (turfc takes the same flags)
+turf build --allow E157 --warn E163     # flags repeat; a later flag for a code wins
+turfc prog.tr --check --lint-set 2.1    # warnings added after 2.1 start at allow
+```
+
+```toml
+# turf.toml
+[lints]
+lint-set = "2.1"
+E163 = "allow"
+E158 = "deny"
+```
+
+- `turf` passes the `[lints]` table to the compiler as flags ahead of the ones you type, so a command-line flag beats the file. The compiler itself never reads `turf.toml`: a script that drives `turfc` passes the flags (driver interface 1.8 or later; `turfc --version`, second line).
+- A denied warning prints with the `error` header and keeps its `Warning:` text, plus the line `E163 is a warning by default; its lint level here is deny.`
+- `--lint-set 2.N` (or `lint-set = "2.N"`) starts every warning added after release 2.N at `allow`; a level named for the code still wins. A set newer than the compiler is an error.
+- A code that does not exist, a word that is not a code, or `--allow`/`--warn` of an error's code is a usage error (status 2). `--deny` of an error's code is accepted and changes nothing.
+- A warning inside the standard library is hidden unless `--stdlib-warnings`, and is never denied unless that flag is given.
+- The `[lints]` table has no effect in a single-file compile; pass the flags.
 
 ## 6. When a compiled program fails
 

@@ -34,10 +34,15 @@ jsonx    = { git = "https://github.com/someone/jsonx", tag = "v1.2.0" }   # or b
 
 [unsafe]
 allow = ["cwrapper"]     # dependencies whose `unsafe module;` is honored
+
+[lints]
+lint-set = "2.1"         # optional: warnings added after release 2.1 start at allow
+E163 = "allow"           # level of one warning, by code: "allow", "warn" or "deny"
 ```
 
-- Only these three tables exist. **Unknown keys are errors.**
+- Only these four tables exist. **Unknown keys are errors.**
 - The dependency key must equal that package's own name.
+- **`[lints]`** keys are warning codes (`E163 = "allow"`, `"warn"` or `"deny"`) plus `lint-set = "2.N"`. `turf` passes the table to the compiler as `--lint-set` / `--allow` / `--warn` / `--deny` flags ahead of the ones you type, so a command-line flag wins. Needs driver interface 1.8 or later. See `diagnostics.md` (Lint levels).
 - **Direct dependencies only:** you may import only packages you list yourself, not transitive ones (E091). There is one version per package name across the graph.
 - **Commands:** `turf add NAME --path DIR`, `turf add NAME --git URL --tag v1`, `turf remove NAME`, `turf update` (git deps), `turf fetch`, `turf graph` (JSON).
 - **CI flags:** `--locked` (fail if `turf.lock` would change) and `--offline`.
@@ -113,7 +118,7 @@ A test is a **whole program** in `tests/` (any depth). One file is one test, and
 | Directive (comment at top of file) | Meaning |
 |---|---|
 | `// EXPECT-DIAG: E066` | compiler output contains that code |
-| `// EXPECT-DIAG: some text` | ... or that text (warnings have no code) |
+| `// EXPECT-DIAG: some text` | ... or that text (a warning has a code too: `// EXPECT-DIAG: E163`) |
 | `// EXPECT-NO-DIAG: warning` | output must NOT contain the text (keeps a library warning-free) |
 | `// EXPECT-FIX: replace 'nmae' with 'name'` | the compiler printed exactly that `Fix:` line (2.1.0+); the runner also applies the printed fixes and checks the fixed program has fewer errors and none new. Optional: a test without it is unaffected by fixes |
 | `// EXPECT-RUNTIME: msg` | the aborting program printed `msg` (pin the part after `file:line:`) |
@@ -177,5 +182,5 @@ fn main(): int {
 ## 6. Single-file mode vs project mode
 
 - `turf file.tr` / `turf run file.tr` / `turfc file.tr`: modules are found in the stdlib, installed packages (`lib/usr`), the file's own directory and the current directory. `[dependencies]` are **not** visible; for those, use `turf build`/`turf run` in the project.
-- `turfc` never reads `turf.toml`. `turf build` writes `build/package-graph.json` and runs `turfc --package-graph` with it.
+- `turfc` never reads `turf.toml`, so `[lints]` has no effect in single-file mode: pass `--allow`/`--warn`/`--deny E0NN` yourself. `turf build` writes `build/package-graph.json` and runs `turfc --package-graph` with it.
 - **To test a module quickly without the project machinery:** put a scratch `main` file next to the module and compile it in single-file mode. Imports resolve from the file's directory.
