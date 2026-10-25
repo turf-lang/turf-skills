@@ -324,7 +324,8 @@ fn main(): int {
 - **Annotations** go on the line before `fn`, `operator` or `extern fn`, and before `pub`:
   - `@caller_location`;
   - `@ownership(acquires)` / `@ownership(releases: p)` (raw-memory tracking);
-  - `@ffi(linux: sym)`.
+  - `@ffi(linux: sym)`;
+  - `@test` / `@test(compile_error, E041, "text")` / `@test(panic, "text")` / `@test(exit, 3)` / `@test(error, Type::Variant)` (a test function; see projects-and-testing.md).
 
 ```turflang
 struct Counter { n: int }

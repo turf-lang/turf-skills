@@ -128,9 +128,10 @@ A test is a **whole program** in `tests/` (any depth). One file is one test, and
   - Always pin `fail_` tests. An unpinned one passes on *any* compile error, including a typo in the test itself.
   - To discover the code, run the file without the `fail_` prefix and read the header, or pin `E000` to have the failure message print the diagnostic.
   - Keep each `fail_` test to one mistake.
+- **`@test` functions:** a file in `tests/` can hold `fn name(): void { ... }` (or `(): !void`) marked `@test`; each runs in its own process and is reported as `[tests] file.tr: name ... PASS`. Without an outcome it passes when it returns. Outcomes: `@test(compile_error, E041, "text")` (+ `fix: "text"`), `@test(warning, E172, "text")`, `@test(no_warnings)`, `@test(panic, "text")`, `@test(exit, 3)`, `@test(error, Type::Variant)`. Such a file needs no `main`. `@test` functions in `src/` files run too (beside the code they check; private items are visible). A normal build checks these functions and leaves them out; nothing may call a test or use it as a value (E173). A malformed one is E146.
 - **Environment:** tests run in parallel, each in its own directory (data files beside the test can be opened by relative path), with no stdin and a 5 s timeout. Flags: `--jobs N`, `--timeout S`, `--exclude PATH`, `-O0…`.
 - **Imports:** a test can import the package's own modules (including internal ones), its direct dependencies, the stdlib and `*_module.tr` helpers.
-- **Errors:** a project with no `tests/` directory, or with no tests, is an error, not a pass.
+- **Errors:** a project with no test anywhere (no `tests/` and no `@test` in `src/`, or a `tests/` with no tests) is an error, not a pass.
 - **Outside a project:** `turfc --test DIR` runs a directory of tests.
 
 **Assertions** (`import test;`; a bare `assert` is E041):
