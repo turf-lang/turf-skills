@@ -56,7 +56,7 @@ An error with exactly one right edit also ends with a `Fix:` block (TurfLang 2.1
 
 - **Categories:** type mismatch, undeclared variable, control flow, syntax error, arithmetic, string conversion, array error, declaration, function signature, builtin function, memory error, general.
 - **Ordering:** files come in compile order (your file, then imported modules). Within a file, diagnostics are sorted by position. Paths are relative to where you ran the command.
-- **Warnings** have the same shape and the same header with a code: `── warning at line 2, col 5 [E163 · control flow]`. Every warning has a code (E074, E075, E094, E152-E171), and the code is what a lint level names.
+- **Warnings** have the same shape and the same header with a code: `── warning at line 2, col 5 [E163 · control flow]`. Every warning has a code (E074, E075, E094, E152-E172), and the code is what a lint level names.
 - **Stdlib warnings** are hidden unless you pass `--stdlib-warnings`. Errors are never hidden.
 - **`Fix:` blocks** are checked before they are printed: the compiler applied the edit to a copy of the program, analysed it again, and the error was gone with no new error. Apply them as written. Wordings: `replace 'a' with 'b'`, `remove 'pub'`, `insert ';' at the end of line N`, `insert '<T>' after 'fn'`, `move 'pub' to just before 'fn'`. They exist for a misspelled name with **one** close match (variable, function, method, field, type, variant, module symbol, scope qualifier, keyword), `x::m` on an instance, `Type.m` on a type, a static method called through an instance, `static` on a constructor, a misplaced `pub`, assigning to an `immut` variable (its declaration becomes `mut`), a missing `;` and a generic struct's method without `<T>`. No `Fix:` means several edits are plausible; the hint lists them. `--smart-write-fix=<path>` writes the whole program with every shown `Fix:` applied, in any build.
 - **"Did you mean" hints** (`Hint: It may be from the current file: 'counter'`) are edit-distance matches against names actually in scope. They are reliable for typos.
@@ -172,6 +172,11 @@ E158 = "deny"
 - A code that does not exist, a word that is not a code, or `--allow`/`--warn` of an error's code is a usage error (status 2). `--deny` of an error's code is accepted and changes nothing.
 - A warning inside the standard library is hidden unless `--stdlib-warnings`, and is never denied unless that flag is given.
 - The `[lints]` table has no effect in a single-file compile; pass the flags.
+
+### Machine-readable output
+
+- `turfc prog.tr --check --diagnostics=json` writes each diagnostic to stderr as one line holding one JSON object (code, severity, category, message, hint, span, related locations, the checked fix as edits, `denied`), schema `"version": "1.0"`; no headers, no colour. The exit status is the same as for text.
+- `turfc --version --json` prints one JSON object: `turfc`, `interface`, `schemas`, `features`. A tool reads it instead of the text of `--version`.
 
 ## 6. When a compiled program fails
 

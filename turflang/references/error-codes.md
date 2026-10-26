@@ -1,6 +1,6 @@
 # Turf error-code index
 
-Turf compiler diagnostics carry stable identifiers `E001` through `E171`: a code is never reassigned, and retired codes are kept so old logs still resolve. The code appears in the diagnostic header, for example `── error at line 4, col 18 [E001 · array error]`, as `[E0NN · category]`. Run `turf explain E0NN` (or `turfc --explain E0NN`) to print the full page: what it means, a wrong example and the fix. Below, codes are grouped by category (the compiler's `SLM::ErrorCategory`, shown as `UPPER_CASE`; the diagnostic header prints it lowercased with spaces). "Class name" is the compiler's error class for the code. Rows marked "Warning" do not stop compilation by default; only a warning code has a lint level (`--allow E163`, `--warn E163`, `--deny E163`, or a `[lints]` table in `turf.toml`; see `diagnostics.md`), and a denied warning is an error. Every warning has a code and prints it in its header. 171 codes in all: 165 are active (23 of them warnings: E074, E075, E094 and E152-E171); 6 are retired (see the retired table). Facts come from `docs/errors/codes/E0NN.txt`; class names and categories come from `src/diagnostics/ErrorCodes.h`, because the code pages themselves carry no header.
+Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code is never reassigned, and retired codes are kept so old logs still resolve. The code appears in the diagnostic header, for example `── error at line 4, col 18 [E001 · array error]`, as `[E0NN · category]`. Run `turf explain E0NN` (or `turfc --explain E0NN`) to print the full page: what it means, a wrong example and the fix. Below, codes are grouped by category (the compiler's `SLM::ErrorCategory`, shown as `UPPER_CASE`; the diagnostic header prints it lowercased with spaces). "Class name" is the compiler's error class for the code. Rows marked "Warning" do not stop compilation by default; only a warning code has a lint level (`--allow E163`, `--warn E163`, `--deny E163`, or a `[lints]` table in `turf.toml`; see `diagnostics.md`), and a denied warning is an error. Every warning has a code and prints it in its header. 173 codes in all: 167 are active (24 of them warnings: E074, E075, E094 and E152-E172); 6 are retired (see the retired table). Facts come from `docs/errors/codes/E0NN.txt`; class names and categories come from `src/diagnostics/ErrorCodes.h`, because the code pages themselves carry no header.
 
 ## TYPE_MISMATCH (Type mismatch)
 
@@ -30,7 +30,7 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E171`: a code
 | E043 | UseBeforeDeclarationError | Variable used above the line that declares it in the same block. | Move the `mut`/`immut` declaration before first use. |
 | E054 | StructMethodNotFoundError | Method called on a struct does not exist, e.g. `c.incrament()`. | Fix spelling, check receiver and `static`, or declare `fn Counter.name(...)`. |
 | E068 | UnknownStructFieldError | `.field` not declared on the struct, or `.field` on a non-struct (string, int). | Fix spelling, add the field to the struct, or call a method with `()` like `s.length()`. |
-| E131 | MethodOnNonStructError | Method call on non-struct, e.g. `x.foo()` on int, `a.reverse()` on array, `s.copy()` on string. | Call as `module::fn(x)` (e.g. `math::abs(x)`), check spelling/import; arrays only have `length()`, `copy()`. |
+| E131 | MethodOnNonStructError | Method call on non-struct, e.g. `x.foo()` on int, `a.reverse()` on array, `s.copy()` on string. | Call as `module::fn(x)` (e.g. `math::abs(x)`), check spelling/import; arrays only have `length()`, `copy()`. Also a method declared on its own type parameter: `fn<Holder> Holder.count()`; write `fn<T> Holder.count()` for `struct Holder<T>`. |
 
 ## CONTROL_FLOW (Control flow)
 
@@ -185,6 +185,8 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E171`: a code
 | E148 | WrongTypeArgumentCountError | Wrong number of type arguments, e.g. `Point<int>` or `Box<int, int>`. | Match the declaration: `Point`, `Box<int>`. |
 | E152 | ShadowingWarning | Warning: a variable declared with the name of one still in scope (`immut count` inside a block that sees an outer `count`). | Give the inner variable another name. |
 | E153 | UnreachableStateWarning | Warning: a `machine` state no `->` edge leads into (expected for the start state). | Add the missing edge, or allow the warning for a start state. |
+| E172 | DeprecatedUseWarning | Warning: a call to a `fn` or `extern fn` marked `@deprecated("msg")`; the message is shown. | Call what the message names; allow it for a whole build with `--allow E172`. |
+| E173 | TestFunctionUseError | A function marked `@test` is called or used as a value; every build leaves tests out of the program. | Move the shared steps into an ordinary function and call that from both; run a test with `turf test`. |
 
 ## FUNCTION_SIGNATURE (Function signature)
 

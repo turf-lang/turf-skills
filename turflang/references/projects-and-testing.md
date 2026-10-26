@@ -57,6 +57,8 @@ turf test [paths]     → run tests
 turf fmt --write      → format src/ and tests/ (indentation/whitespace only)
 turf fmt --check      → CI gate; exit 1 if anything would change
 turf clean            → delete build/
+turf audit            → per package and stdlib: files, `unsafe module;`, `unsafe { }`, `extern fn`, C libraries, whether `[unsafe] allow` grants it
+turf graph --unsafe   → the package graph JSON plus each package's unsafe surface
 turf run file.tr      → run one file on its own, outside the package
 ```
 

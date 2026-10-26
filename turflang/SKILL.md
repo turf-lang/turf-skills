@@ -7,7 +7,7 @@ description: Write, read, debug, fix, test and port code in TurfLang (Turf), the
 
 Turf is not C, Rust, Go or Python, even where it looks like them. Most mistakes agents make come from guessing syntax from those languages. This skill gives you the real rules. **Do not guess Turf syntax; check it here or in `references/`.**
 
-Turf 2.1: static types, ahead-of-time compiled through LLVM, garbage-collected heap, checked references (`&T`, `&?T`), real monomorphized generics, error unions (`!T` with `recover`/`try`), `compare` pattern matching, `machine` state machines, and checked arithmetic and indexing. Release builds keep every runtime check.
+Turf 2.2: static types, ahead-of-time compiled through LLVM, garbage-collected heap, checked references (`&T`, `&?T`), real monomorphized generics, error unions (`!T` with `recover`/`try`), `compare` pattern matching, `machine` state machines, and checked arithmetic and indexing. Release builds keep every runtime check.
 
 ## Files in this skill
 
