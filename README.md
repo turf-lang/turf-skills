@@ -4,7 +4,7 @@ Agent skills for working with [TurfLang](https://github.com/turf-lang/turf-lang)
 
 | Skill | What it teaches |
 |---|---|
-| [`turflang/`](turflang/SKILL.md) | Turf 2.1 syntax and semantics, the standard library, the compile/fix loop with the compiler's diagnostics and `--smart`, projects and `turf test`, and porting code into Turf |
+| [`turflang/`](turflang/SKILL.md) | Turf 2.2 syntax and semantics, the standard library, the compile/fix loop with the compiler's diagnostics and `--smart`, projects and `turf test`, and porting code into Turf |
 
 ## Install
 
@@ -47,8 +47,8 @@ A skill is `SKILL.md` (always read) plus `references/` and `examples/`, which th
 SKILL.md                         workflow, core syntax, the traps
 references/language.md           full language rules (condensed reference)
 references/stdlib.md             every stdlib module and signature
-references/diagnostics.md        fix loop, diagnostic anatomy, --smart, runtime panics
-references/error-codes.md        E001–E151: trigger and usual fix
+references/diagnostics.md        fix loop, diagnostic anatomy, lint levels, --smart, runtime panics
+references/error-codes.md        E001–E173: trigger and usual fix
 references/projects-and-testing.md  turf.toml, modules, packages, turf test
 references/porting.md            idiom map from other languages, 1.x → 2.0
 examples/*.tr                    complete programs (compiled and run)
@@ -67,4 +67,4 @@ git push --follow-tags
 
 ## Keeping it accurate
 
-The content is derived from `docs/` in the turf-lang repository. Every `turflang` code block that is a complete program, and every file in `examples/`, compiles with `turfc` 2.1.x. The exception is the wrong/right fragments in `error-codes.md`. When the language changes, re-check the examples with `turfc --check`.
+The content is derived from `docs/` in the turf-lang repository. Every `turflang` code block that is a complete program, and every file in `examples/`, compiles with `turfc` 2.2.x. The exception is the wrong/right fragments in `error-codes.md`. When the language changes, re-check the examples with `turfc --check`.

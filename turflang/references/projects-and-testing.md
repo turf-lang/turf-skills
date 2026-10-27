@@ -34,10 +34,15 @@ jsonx    = { git = "https://github.com/someone/jsonx", tag = "v1.2.0" }   # or b
 
 [unsafe]
 allow = ["cwrapper"]     # dependencies whose `unsafe module;` is honored
+
+[lints]
+lint-set = "2.1"         # optional: warnings added after release 2.1 start at allow
+E163 = "allow"           # level of one warning, by code: "allow", "warn" or "deny"
 ```
 
-- Only these three tables exist. **Unknown keys are errors.**
+- Only these four tables exist. **Unknown keys are errors.**
 - The dependency key must equal that package's own name.
+- **`[lints]`** keys are warning codes (`E163 = "allow"`, `"warn"` or `"deny"`) plus `lint-set = "2.N"`. `turf` passes the table to the compiler as `--lint-set` / `--allow` / `--warn` / `--deny` flags ahead of the ones you type, so a command-line flag wins. Needs driver interface 1.8 or later. See `diagnostics.md` (Lint levels).
 - **Direct dependencies only:** you may import only packages you list yourself, not transitive ones (E091). There is one version per package name across the graph.
 - **Commands:** `turf add NAME --path DIR`, `turf add NAME --git URL --tag v1`, `turf remove NAME`, `turf update` (git deps), `turf fetch`, `turf graph` (JSON).
 - **CI flags:** `--locked` (fail if `turf.lock` would change) and `--offline`.
@@ -52,6 +57,8 @@ turf test [paths]     → run tests
 turf fmt --write      → format src/ and tests/ (indentation/whitespace only)
 turf fmt --check      → CI gate; exit 1 if anything would change
 turf clean            → delete build/
+turf audit            → per package and stdlib: files, `unsafe module;`, `unsafe { }`, `extern fn`, C libraries, whether `[unsafe] allow` grants it
+turf graph --unsafe   → the package graph JSON plus each package's unsafe surface
 turf run file.tr      → run one file on its own, outside the package
 ```
 
@@ -113,7 +120,7 @@ A test is a **whole program** in `tests/` (any depth). One file is one test, and
 | Directive (comment at top of file) | Meaning |
 |---|---|
 | `// EXPECT-DIAG: E066` | compiler output contains that code |
-| `// EXPECT-DIAG: some text` | ... or that text (warnings have no code) |
+| `// EXPECT-DIAG: some text` | ... or that text (a warning has a code too: `// EXPECT-DIAG: E163`) |
 | `// EXPECT-NO-DIAG: warning` | output must NOT contain the text (keeps a library warning-free) |
 | `// EXPECT-FIX: replace 'nmae' with 'name'` | the compiler printed exactly that `Fix:` line (2.1.0+); the runner also applies the printed fixes and checks the fixed program has fewer errors and none new. Optional: a test without it is unaffected by fixes |
 | `// EXPECT-RUNTIME: msg` | the aborting program printed `msg` (pin the part after `file:line:`) |
@@ -123,9 +130,10 @@ A test is a **whole program** in `tests/` (any depth). One file is one test, and
   - Always pin `fail_` tests. An unpinned one passes on *any* compile error, including a typo in the test itself.
   - To discover the code, run the file without the `fail_` prefix and read the header, or pin `E000` to have the failure message print the diagnostic.
   - Keep each `fail_` test to one mistake.
+- **`@test` functions:** a file in `tests/` can hold `fn name(): void { ... }` (or `(): !void`) marked `@test`; each runs in its own process and is reported as `[tests] file.tr: name ... PASS`. Without an outcome it passes when it returns. Outcomes: `@test(compile_error, E041, "text")` (+ `fix: "text"`), `@test(warning, E172, "text")`, `@test(no_warnings)`, `@test(panic, "text")`, `@test(exit, 3)`, `@test(error, Type::Variant)`. Such a file needs no `main`. `@test` functions in `src/` files run too (beside the code they check; private items are visible). A `compile_error` test's expected errors and a `warning` test's expected warning are the test's own: the build succeeds and no lint level applies to them. A normal build checks these functions and leaves them out; nothing may call a test or use it as a value (E173). A malformed one is E146.
 - **Environment:** tests run in parallel, each in its own directory (data files beside the test can be opened by relative path), with no stdin and a 5 s timeout. Flags: `--jobs N`, `--timeout S`, `--exclude PATH`, `-O0…`.
 - **Imports:** a test can import the package's own modules (including internal ones), its direct dependencies, the stdlib and `*_module.tr` helpers.
-- **Errors:** a project with no `tests/` directory, or with no tests, is an error, not a pass.
+- **Errors:** a project with no test anywhere (no `tests/` and no `@test` in `src/`, or a `tests/` with no tests) is an error, not a pass.
 - **Outside a project:** `turfc --test DIR` runs a directory of tests.
 
 **Assertions** (`import test;`; a bare `assert` is E041):
@@ -177,5 +185,5 @@ fn main(): int {
 ## 6. Single-file mode vs project mode
 
 - `turf file.tr` / `turf run file.tr` / `turfc file.tr`: modules are found in the stdlib, installed packages (`lib/usr`), the file's own directory and the current directory. `[dependencies]` are **not** visible; for those, use `turf build`/`turf run` in the project.
-- `turfc` never reads `turf.toml`. `turf build` writes `build/package-graph.json` and runs `turfc --package-graph` with it.
+- `turfc` never reads `turf.toml`, so `[lints]` has no effect in single-file mode: pass `--allow`/`--warn`/`--deny E0NN` yourself. `turf build` writes `build/package-graph.json` and runs `turfc --package-graph` with it.
 - **To test a module quickly without the project machinery:** put a scratch `main` file next to the module and compile it in single-file mode. Imports resolve from the file's directory.

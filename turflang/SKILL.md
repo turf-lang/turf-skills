@@ -7,7 +7,7 @@ description: Write, read, debug, fix, test and port code in TurfLang (Turf), the
 
 Turf is not C, Rust, Go or Python, even where it looks like them. Most mistakes agents make come from guessing syntax from those languages. This skill gives you the real rules. **Do not guess Turf syntax; check it here or in `references/`.**
 
-Turf 2.1: static types, ahead-of-time compiled through LLVM, garbage-collected heap, checked references (`&T`, `&?T`), real monomorphized generics, error unions (`!T` with `recover`/`try`), `compare` pattern matching, `machine` state machines, and checked arithmetic and indexing. Release builds keep every runtime check.
+Turf 2.2: static types, ahead-of-time compiled through LLVM, garbage-collected heap, checked references (`&T`, `&?T`), real monomorphized generics, error unions (`!T` with `recover`/`try`), `compare` pattern matching, `machine` state machines, and checked arithmetic and indexing. Release builds keep every runtime check.
 
 ## Files in this skill
 
@@ -16,7 +16,7 @@ Turf 2.1: static types, ahead-of-time compiled through LLVM, garbage-collected h
 | `SKILL.md` (this file) | Always. It covers the workflow, the core syntax, and the traps. |
 | `references/language.md` | Writing anything beyond the basics: the full rules for types, casts, operators, control flow, patterns, errors, functions, modules, structs, generics, arrays, references, `unsafe`/FFI. |
 | `references/stdlib.md` | Calling any library function: exact signatures, which module to import, what panics, and which error variants come back. |
-| `references/diagnostics.md` | A compile fails or a program panics. Covers the fix loop, how to read a diagnostic, `--smart`, warnings and runtime panics. |
+| `references/diagnostics.md` | A compile fails or a program panics. Covers the fix loop, how to read a diagnostic, `--smart`, warnings and their lint levels, and runtime panics. |
 | `references/error-codes.md` | You have an `E0NN` code and want its meaning and usual fix. |
 | `references/projects-and-testing.md` | Working in a `turf.toml` project: layout, imports across modules and packages, dependencies, `turf test` conventions. |
 | `references/porting.md` | Translating code from C/C++/Rust/Go/Python/JS/Java into Turf (or back), or upgrading Turf 1.x code. |
@@ -226,7 +226,7 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
 
 1. Reproduce: `turf check` for compile errors, `turf run` for behaviour. For runtime panics, the message names `file:line`. Debug with `-O0 -g` plus `gdb`/`lldb` (breakpoints by `file.tr:line`, locals by name), or add `printline` / `io::eprintline` traces (stdout is flushed before a panic message).
 2. Read the diagnostic's `Fix:` (apply it), Hint and Notes. For generic code, the Notes list the instantiation chain from your call down to the failing line inside the library.
-3. Fix the root cause rather than silencing the symptom. **There are no flags to disable checks or warnings**; the only way to silence a warning is to fix what it points at. Prefix intentionally unused variables with `_`.
+3. Fix the root cause rather than silencing the symptom. No flag disables an error check. A warning has a code (`E163`) and a lint level, so `--allow E163` hides it and `--deny E163` makes it an error (or a `[lints]` table in `turf.toml`); allow one only when the code is right as written. Prefix intentionally unused variables with `_`.
 4. Add a regression test (`tests/<name>.tr` that exits 0, or a `fail_<name>.tr` with `// EXPECT-DIAG: E0NN` for "must not compile"). See `references/projects-and-testing.md`.
 
 ## Rewriting or porting a codebase

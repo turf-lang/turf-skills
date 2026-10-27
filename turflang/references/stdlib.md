@@ -104,7 +104,7 @@ fn main(): int {
 | `round(x: double): double` | half away from zero |
 | `floor(x: double): double` / `ceil(x: double): double` | |
 
-round/floor/ceil delegate to libm: exact for all doubles, NaN/inf pass through. No `is_nan`: use `x != x`.
+round/floor/ceil delegate to libm: exact for all doubles, NaN/inf pass through. Test for NaN with `math::is_nan(x)`.
 
 ## bool   (prelude; methods only)
 
@@ -230,7 +230,10 @@ fn main(): int {
 
 ## math   (prelude; bare or `math::`; constants qualified)
 
-Constants: `PI: double`, `E: double`.
+Constants (all `double` unless noted; written `math::X`):
+- `PI`, `TAU`, `E`, `PHI`, `SQRT2`, `SQRT1_2`, `LN2`, `LN10`, `LOG2E`, `LOG10E`.
+- Limits: `INT_MAX`, `INT_MIN` (`int`), `INT32_MAX`, `INT32_MIN` (`int32`), `DOUBLE_MAX`, `DOUBLE_MIN` (the most negative finite double), `DOUBLE_MIN_POSITIVE` (C's `DBL_MIN`), `DOUBLE_EPSILON`.
+- `INFINITY`, `NEG_INFINITY`, `NAN`. Arithmetic never produces them; they come from these constants and libm. NaN equals nothing, itself included: `x == math::NAN` is always `false`.
 
 | Signature | Notes |
 |---|---|
@@ -242,6 +245,8 @@ Constants: `PI: double`, `E: double`.
 | `clamp(val: int, min_val: int, max_val: int): int` / `clamp(val: double, min_val: double, max_val: double): double` | need `min_val <= max_val` |
 | `power(base: int, exp: int): int` | via float pow, TRUNCATES toward zero (`power(2,-1)`=0), inexact beyond 2^53, panics `Integer overflow` if too big |
 | `power(base: double, exp: double): double`, `power(base: int, exp: double): double`, `power(base: double, exp: int): double` | |
+| `is_nan(val: double): bool` / `is_infinite(val: double): bool` / `is_finite(val: double): bool` | infinite is `INFINITY` or `NEG_INFINITY`; finite is neither that nor NaN. Also `x.is_nan()` |
+| `wrapping_add`, `wrapping_sub`, `wrapping_mul`, `wrapping_div`, `wrapping_rem` (all `(a: int, b: int): int`); `wrapping_shl`, `wrapping_shr` (`(a: int, n: int): int`); `wrapping_neg`, `wrapping_abs` (`(a: int): int`); `wrapping_pow(base: int, exp: int): int` | `int` arithmetic that wraps modulo 2^64 instead of panicking (`wrapping_add(INT_MAX, 1)` = `INT_MIN`); for hashes and checksums. `shl`/`shr` use `n` modulo 64. `wrapping_div`/`wrapping_rem` by zero and `wrapping_pow` with a negative exponent still panic, at the calling line |
 | `divide(a: int, b: int): !int` / `divide(a: double, b: double): !double` | `MathError::DivisionByZero` when `b` is 0/0.0; int division truncates toward zero. (`/` on ints panics on zero) |
 
 Error: `error MathError { DivisionByZero }`.

@@ -1,4 +1,4 @@
-# TurfLang 2.1 language reference (condensed)
+# TurfLang 2.2 language reference (condensed)
 
 Condensed from the official reference (`docs/reference/*.md` in the turf-lang repo). Every rule here comes from those pages. The codes in parentheses are what the compiler reports when you break the rule; look them up in `error-codes.md`.
 
@@ -138,6 +138,8 @@ fn main(): int {
     immut a: int[3] = [1, 2, 3];
     for v in a { n += v; }                    // v is a copy
     for (i, v) in a { n += i * v; }
+    for c in "ab" { n += c to int; }          // a string: c is a char, one byte at a time
+    for (i, c) in "ab" { n += i; }
     return n;
 }
 ```
@@ -149,7 +151,7 @@ fn main(): int {
   - `continue` still runs the `step`.
   - The loop variable is local to the loop.
   - `(i, v)` on a range is E120.
-- **For-each** works only on arrays, slices and array literals. `List`, `Map`, strings and structs are E005; iterate them by index.
+- **For-each** works on arrays, slices, array literals and strings. `for c in s` and `for (i, c) in s` walk the bytes of a string (`c` is a `char`); the string and its length are read once, before the loop. `List`, `Map` and structs are E005; iterate them by index.
 - **`break` / `continue`:** no labels. They act on the innermost loop, including from inside a `compare` arm or a `recover` block. Outside a loop they are E007.
 - **A statement after `return/break/continue`** in the same block is E012. An unreachable block is warning E074.
 - **`defer stmt;`** runs when the enclosing block exits (not the function):
@@ -321,10 +323,14 @@ fn main(): int {
   - The receiver must match the first parameter exactly (except that `T[N]` fits `T[]`). Other arguments may widen.
   - Dot syntax reaches any visible (`pub`) free function in the program, not only those imported by this file.
   - This is how `s.length()`, `c.is_digit()`, `n.abs()` and `a.sum(3)` work.
+  - It reaches generic functions: `a.twice()` infers `T` from `a`, `a.twice::<int>()` writes it. A struct's bound method takes no written type arguments (`l.push::<int>(1)` is E148).
+  - An integer literal can be the receiver: `1.twice()` is `twice(1)`. Unary minus applies after the call, so `-1.abs()` is `-(1.abs())` (`-1`); write `(-1).abs()` for `1`, and `(1.5).floor()` for a decimal literal.
 - **Annotations** go on the line before `fn`, `operator` or `extern fn`, and before `pub`:
   - `@caller_location`;
   - `@ownership(acquires)` / `@ownership(releases: p)` (raw-memory tracking);
-  - `@ffi(linux: sym)`.
+  - `@ffi(linux: sym)`;
+  - `@deprecated("use add_all instead")` on a `fn` or `extern fn`: every call is warning E172 with that message (the program still compiles);
+  - `@test` / `@test(compile_error, E041, "text")` / `@test(panic, "text")` / `@test(exit, 3)` / `@test(error, Type::Variant)` (a test function; see projects-and-testing.md).
 
 ```turflang
 struct Counter { n: int }
@@ -368,7 +374,7 @@ fn main(): int {
   - Exactly one file must answer to the name (E090 if two do), and module names are never paths.
   - A module must not share a name with a stdlib module (e.g. `list.tr`). Missing modules are E027, circular imports E019.
 - **`::` vs `.`:** `::` names namespace members: `m::f()`, `Enum::V`, `Type::static_m()`, `Type::new()`, `m::Type::default()`. `.` reaches into values. E048 for `io.printline`, E029 for `var::x`, E052 for calling a static method through a value.
-- **Constants:** `export immut LIMIT: int = 10;` must be top-level, must have a literal or foldable value, and is always public.
+- **Constants:** `export immut LIMIT: int = 10;` must be top-level, must have a literal or foldable value, and is always public. The number may start with one `-`: `export immut BELOW: int = -5;`.
 - **Visibility:** everything is private to its module unless marked `pub` (or `public`).
   - Applies to functions, methods, structs, enums, errors, machines, `extern fn`s **and each struct field**.
   - Enum variants and machine states follow their type. Operators follow their operand types; `pub operator` is E087.
@@ -492,12 +498,12 @@ fn main(): int {
 ```
 
 - **Monomorphized:** each instantiation is compiled and type-checked on its own, with no boxing. `sizeof(T)` is the real size. Unused instantiations are never compiled.
-- **Declaration:** `fn<T, U> f(...)`, `struct S<T> { }`, `fn<T> S.method()`, `operator<T> + (...)`. A method can add type parameters of its own: `fn<A, B, U> Pair.pick(x: U): U`.
+- **Declaration:** `fn<T, U> f(...)`, `struct S<T> { }`, `fn<T> S.method()` (the receiver is the struct, never a type parameter: `fn<T> T.m()` is E131), `operator<T> + (...)`. A method can add type parameters of its own: `fn<A, B, U> Pair.pick(x: U): U`.
 - **Inference only:**
   - For functions, type arguments are inferred from the arguments. Every type parameter must appear in the parameter list (`fn<T> make(): T` is E129). Arguments must agree exactly, with no widening (`pair(1, 2.5)` is E056).
   - For generic structs, type arguments come from the declared type of the destination (variable, field, parameter, return, element).
   - **Size parameters:** `fn<T, N: size> fill(value: T): T[N] { mut r: T[N]; for i in 0..N { r[i] = value; } return r; }`. `N` is an array length that reads as an `int` in the body and is a free-function-only parameter. A call gets `N` from an array argument (`reversed(a)`) or else from the type the result goes into: a written declaration type, an assignment target, a non-generic parameter, a `return` with a written return type (`mut z: int[8] = fill(0);`). Nothing gives `N` (`mut d = fill(0);`, a bare `fill(0);`): E129. `N` on a struct, method or operator, `N` used as a type, a same-named value parameter, or `N = 3` / `N++` / `&N`: E150. Copy it to change it: `mut n: int = N;`.
-  - **Never write `f<int>(x)` or `S<int>::default()`** (E110).
+  - **Written type arguments** go after `::` at the use: `List<int>::default()`, `Box<int>::new(1)`, `identity::<int>(7)`, `second::<int, string>(1, "b")`, `x.twice::<int>()`, and `identity::<int>` as a function value. A size parameter is not written (`fill::<double>(1)` writes `T` only). `f<int>(x)` without the `::` is E110.
   - Generic types without arguments are E138; the wrong argument count is E148.
 - **No constraints or traits:** the body may use any operation; the instantiation fails at your call site if `T` lacks it. The error is the normal code (E124, E057, E068, E131), with `Note:` lines showing the instantiation chain. To accept types without an operation, take a function parameter.
 - **Limits:** recursion depth 64 or too many instantiations is E079. A by-value cycle through instantiation is E069.
