@@ -330,7 +330,7 @@ fn main(): int {
   - `@ownership(acquires)` / `@ownership(releases: p)` (raw-memory tracking);
   - `@ffi(linux: sym)`;
   - `@deprecated("use add_all instead")` on a `fn` or `extern fn`: every call is warning E172 with that message (the program still compiles);
-  - `@test` / `@test(compile_error, E041, "text")` / `@test(panic, "text")` / `@test(exit, 3)` / `@test(error, Type::Variant)` (a test function; see projects-and-testing.md).
+  - `@test` / `@test(compile_error, E041, "text")` / `@test(panic, "text")` / `@test(exit, 3)` / `@test(error, Type::Variant)`, then options such as `timeout: 2000`, `skip: "reason"`, `tag: "slow"` (a test function; see projects-and-testing.md).
 
 ```turflang
 struct Counter { n: int }
