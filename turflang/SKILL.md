@@ -19,7 +19,7 @@ Turf 2.3: static types, ahead-of-time compiled through LLVM, garbage-collected h
 | `references/diagnostics.md` | A compile fails or a program panics. Covers the fix loop, how to read a diagnostic, `--smart`, warnings and their lint levels, and runtime panics. |
 | `references/error-codes.md` | You have an `E0NN` code and want its meaning and usual fix. |
 | `references/projects-and-testing.md` | Working in a `turf.toml` project: layout, imports across modules and packages, dependencies, `turf test` conventions. |
-| `references/porting.md` | Translating code from C/C++/Rust/Go/Python/JS/Java into Turf (or back), or upgrading Turf 1.x code. |
+| `references/porting.md` | Translating code from C/C++/Rust/Go/Python/JS/Java into Turf (or back), or upgrading Turf 1.x or 2.x code to 2.3. |
 | `examples/*.tr`, `examples/inventory/` | You want a complete, compiling program to copy patterns from. All of them were compiled and run. |
 
 ## The working loop

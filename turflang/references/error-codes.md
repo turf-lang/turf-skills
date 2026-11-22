@@ -1,6 +1,6 @@
 # Turf error-code index
 
-Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code is never reassigned, and retired codes are kept so old logs still resolve. The code appears in the diagnostic header, for example `── error at line 4, col 18 [E001 · array error]`, as `[E0NN · category]`. Run `turf explain E0NN` (or `turfc --explain E0NN`) to print the full page: what it means, a wrong example and the fix. Below, codes are grouped by category (the compiler's `SLM::ErrorCategory`, shown as `UPPER_CASE`; the diagnostic header prints it lowercased with spaces). "Class name" is the compiler's error class for the code. Rows marked "Warning" do not stop compilation by default; only a warning code has a lint level (`--allow E163`, `--warn E163`, `--deny E163`, or a `[lints]` table in `turf.toml`; see `diagnostics.md`), and a denied warning is an error. Every warning has a code and prints it in its header. 173 codes in all: 167 are active (24 of them warnings: E074, E075, E094 and E152-E172); 6 are retired (see the retired table). Facts come from `docs/errors/codes/E0NN.txt`; class names and categories come from `src/diagnostics/ErrorCodes.h`, because the code pages themselves carry no header.
+Turf compiler diagnostics carry stable identifiers `E001` through `E197`: a code is never reassigned, and retired codes are kept so old logs still resolve. The code appears in the diagnostic header, for example `── error at line 4, col 18 [E001 · array bounds]`, as `[E0NN · name]` (the code's registered name; the wording around it is not part of the promise, the code is). Run `turf explain E0NN` (or `turfc --explain E0NN`) to print the full page: what it means, a wrong example and the fix. Below, codes are grouped by category (the compiler's `SLM::ErrorCategory`, shown as `UPPER_CASE`; the diagnostic header prints it lowercased with spaces). "Class name" is the compiler's error class for the code. Rows marked "Warning" do not stop compilation by default; only a warning code has a lint level (`--allow E163`, `--warn E163`, `--deny E163`, or a `[lints]` table in `turf.toml`; see `diagnostics.md`), and a denied warning is an error. Every warning has a code and prints it in its header. 197 codes in all: 191 are active (48 of them warnings: E074, E075, E094, E152-E172 and E174-E197); 6 are retired (see the retired table). Warnings E174-E194 start at lint level `allow` (reported only after `--warn E0NN`/`--deny E0NN` or a `[lints]` entry); E195-E197 and every older warning start at `warn`. Facts come from `docs/errors/codes/E0NN.txt`; class names and categories come from `src/diagnostics/ErrorCodes.h`, because the code pages themselves carry no header.
 
 ## TYPE_MISMATCH (Type mismatch)
 
@@ -13,12 +13,14 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 | E062 | NullAssignmentError | `null` assigned to non-pointer type, e.g. `mut n: int = null;`. | Use a real value (`""` for strings, `0`, `T::default()`); for "maybe nothing" use a nullable reference `&?T` (raw `T*` needs `unsafe`). |
 | E064 | ReturnTypeMismatchError | `return` value (or bare `return;`) does not match the function's declared return type. | Return the declared type, or change `: Type`; use `return 0;` or declare `void`. |
 | E066 | TypeError | General type mismatch, e.g. `mut bad: int = "five";`; also struct literal missing fields. | Make the value the expected type, or fix the declared type. Read the detail line. |
-| E082 | UnnarrowedNullableCastError | `to &Box` or `to Box` on a `&?Box` without a null check. | Convert inside `if b != null { ... }`; store field/call results in a variable first. |
+| E082 | UnnarrowedNullableCastError | `to &Box` or `to Box` on a `&?Box` without a null check. | Convert inside `if b != null { ... }`; a checked `&?T` variable or field path is a `&T` as it is (no cast). Store call results in a variable first. |
 | E098 | OperatorTemporaryWriteError | Assigning into a field of an `operator[]` result, e.g. `bs[0].a = 50;` (writes a copy). | Copy out, modify, store back: `mut e: Big = bs[0]; e.a = 50; bs[0] = e;`. |
 | E124 | InvalidComparisonError | Comparison between different types (`x == null` on int, `x == "5"`), structs, or ordering enums. | Compare like types; compare struct fields; use `(a to int) < (b to int)` for enums. |
 | E126 | UnsupportedOperationError | Unsupported form: `x += 1` or `x++` on `int32`, `[]=` compound on custom operator, indexing non-indexable, `sizeof(void)`. | Write it out: `x = (x + 1) to int32;`, `grid[i] = grid[i] + 1;`; add `operator []`; use `sizeof(void*)`. |
 | E134 | InvalidCastError | `to` conversion with no defined meaning, e.g. `5 to bool`, `true to int`. | Compare instead: `n != 0`; or choose numbers: `give 1 otherwise 0`. |
 | E149 | LiteralNeverConvertsError | String literal that always fails run-time conversion, e.g. `"abc" to int`, `"Purple" to Color`. | Write the value: `42`, `Color::Green`; use `strings::parse_int` / `parse_double` with `recover`. |
+| E177 | TypeArgsFromContextWarning | Warning (starts at `allow`): a generic construction takes its type arguments from the context, `mut l: List<int> = List::default();` (3.0 makes it an error). | Write them where it is built, `List<int>::default()`; the `Fix:` does. A constructor whose own arguments fix every type argument (`Box::new(5)`) does not warn. |
+| E181 | IntToDoublePrecisionWarning | Warning (starts at `allow`): an `int` converted to `double` that the compiler cannot prove is within ±2^53. | Keep it an `int`, keep it within ±9007199254740992 before converting, or turn the check off with `--allow E181` where approximate is fine. |
 
 ## UNDECLARED_VAR (Undeclared variable / unknown name)
 
@@ -65,6 +67,14 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 | E165 | EmptyBranchWarning | Warning: an `if`, `elseif` or `else` block with no statements. | Flip the condition so the work is in the `if`, or delete the empty `else`. |
 | E168 | IdenticalBranchesWarning | Warning: an `if` and its `else` with identical bodies. | Fix the copied branch, or drop the `if` and keep one body. |
 | E169 | NeverReturnsErrorWarning | Warning: function declared `: !T` that never returns an error and calls nothing that can fail. | Drop the `!`, or return an error on the failing path. |
+| E182 | MutualRecursionWarning | Warning (starts at `allow`): functions that call each other on every path, so none can return (`is_even` calls `is_odd` calls `is_even`). | Give one of them a path that returns without calling back (`if n == 0 { return true; }`). |
+| E183 | UnreachableBaseCaseWarning | Warning (starts at `allow`): a recursive function's base case that the value ranges prove never runs (an earlier guard excludes it). | Make the base case reachable, e.g. test it first (`if n <= 0 { return 0; }`). |
+| E184 | LoopTestNeverChangesWarning | Warning (starts at `allow`): a `while`/`do while` test reads only variables nothing in the loop writes, and is the only way out. | Change the tested variable inside the loop, or give the loop another exit. |
+| E185 | LoopExitsNeverTakenWarning | Warning (starts at `allow`): every way out of a loop is a test the value ranges prove is never true (`while i >= 0` with `i = (i + 1) % 10`). | Fix the test or the computation it watches. |
+| E186 | LoopExitsBehindNoReturnWarning | Warning (starts at `allow`): every exit of a loop that can be taken follows `sys::panic`/`abort`/`exit`, so the code after the loop never runs. | Let the loop leave before the call, or write `while true` and drop the dead `break` when ending the program is the point. |
+| E195 | EmptyLoopBodyWarning | Warning (on by default): a `while`, `do`, `for` or `for ... in` body with no statements (a `while` whose condition calls a function is exempt). | Write what the loop should do or remove it; a comment in the body marks it deliberate. |
+| E196 | EmptyFunctionBodyWarning | Warning (on by default): a `void` function with no statements (`@test` functions are exempt). | Write the function or remove it and its calls; a comment in the body marks it deliberate. |
+| E197 | EmptyRecoverBlockWarning | Warning (on by default): `recover ... run { }` with an empty block, so the error is dropped. | Report, return or default in the block; a comment saying why ignoring is right marks it deliberate. |
 
 ## SYNTAX_ERROR (Syntax error)
 
@@ -79,10 +89,10 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 | E100 | InvalidEscapeSequenceError | Unknown escape sequence in a string or char, e.g. `\q` or `"C:\temp\q"`. | Use known escapes; double the backslash: `"C:\\temp\\q"`. |
 | E101 | InvalidCharLiteralError | Char literal empty or holding more than one character (`''`, `'ab'`). | Use exactly one char `'a'`, or a string `"ab"`; `'\''` for a quote. |
 | E102 | MissingSemicolonError | Statement not ended with `;` (reported at the next statement's start). | Add `;` at the end of the line above the reported position. |
-| E103 | UnexpectedTokenError | Token that cannot appear here: missing operand (`mut x: int = ;`), stray `;`, keyword as value, top-level `mut`. | Delete the stray token or add the missing operand; check earlier lines for an unclosed bracket. |
+| E103 | UnexpectedTokenError | Token that cannot appear here: missing operand (`mut x: int = ;`), stray `;`, keyword as value, `static` written both before `fn` and after the parameters. | Delete the stray token or add the missing operand; check earlier lines for an unclosed bracket. |
 | E104 | UnclosedDelimiterError | `(`, `[`, `{` or `<` never closed, e.g. `add(1, 2;`. | Add the missing closing bracket; for `{` the error points at the unclosed opener. |
 | E105 | MissingCommaError | Missing comma between list items (struct fields, enum variants, call args, array items). | Add commas between items: `add(1, 2)`; or close the list if it should end. |
-| E106 | MissingColonError | Missing `:` before a return type, or in a parameter or struct field. | Write `fn add(a: int, b: int): int`, `name: string`, `age: int`. |
+| E106 | MissingColonError | Missing `:` before a return type, or in a parameter or struct field. | Write `fn add(a: int, b: int): int`, `name: string`, `age: int`; for a missing return type apply the `Fix:` (`: void` or the type the body returns). |
 | E107 | MissingOpeningDelimiterError | Missing `{` for a block body or `(` for a parameter list; braceless `if x > 0 return 1;`. | Always use braces: `if x > 0 { return 1; }`; write `fn main(): int`. |
 | E108 | ExpectedNameError | A name is expected but absent or a reserved word, e.g. `mut : int = 5;`, `fn (a: int)`. | Give a name: `mut count: int = 5;`. Rename identifiers that are reserved words. |
 | E109 | ExpectedTypeError | A type is expected but missing, e.g. `b:`, `fn get(): {`, `List<>`, `sizeof(a)`. | Write the type: `b: int`; use `void` for no return; `sizeof(int)` takes a type. |
@@ -90,6 +100,9 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 | E111 | NestingTooDeepError | Brackets, `<` or `!` nested beyond the parser's depth limit, usually accidental repetition. | Delete the repeated characters; name inner pieces with `mut` and build step by step. |
 | E118 | StatementOutsideFunctionError | Statement (call, assignment, variable, `return`, `if`) at file top level. | Move it into `fn main(): int { ... return 0; }`. |
 | E139 | MalformedNumberError | Malformed decimal: second `.` (`3.14.15`), trailing `.` (`5.`), or `.` on hex/binary/octal. | Use one point with digits after it: `5.0`, `3.14`; plain decimal instead of `0xFF.5`. |
+| E174 | DecimalLiteralReceiverWarning | Warning (starts at `allow`): a decimal literal is a call receiver without parentheses (`1.5.floor()`, `2.0.f()`, `1e3.f()`). | `(1.5).floor()`; the `Fix:` writes the parentheses. `1.twice()` and `(1.5).f()` do not warn. |
+| E175 | StaticAfterParametersWarning | Warning (starts at `allow`): `static` written after the parameter list, `fn T.m() static: R`. | `static fn T.m(): R` (`pub static fn`); the `Fix:` moves the word. |
+| E176 | ExportImmutWarning | Warning (starts at `allow`): `export immut NAME ...`, the old spelling of `pub immut`. | `pub immut NAME: T = v;`; the `Fix:` replaces `export` with `pub`. |
 
 ## ARITHMETIC (Arithmetic and literal range)
 
@@ -130,9 +143,9 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 |---|---|---|---|
 | E019 | CircularImportError | Two modules `import` each other (import cycle). | Remove an unneeded import, or move shared code into a third module both import. |
 | E020 | ConflictingExternDeclarationError | Same `extern fn` name declared with different parameter or return types. | Make every `extern fn` declaration of that name identical, or rename one on the Turf side. |
-| E021 | ExportMutNotSupportedError | `export mut` used; only constants can be exported. | Use `export immut NAME: T = value;`, or keep it local and add getter/setter functions. |
-| E022 | ExportNonConstantInitializerError | `export immut` initializer is not a literal (expression) or is missing. | Write the literal value: `export immut total: int = 20;`. |
-| E023 | ExportOutsideTopLevelError | `export` written inside a function body. | Move to top level, or drop `export` for a local `immut`. |
+| E021 | ExportMutNotSupportedError | `export mut` used; only constants are shared (a top-level `mut` is E087). | Use `pub immut NAME: T = value;`, or keep the variable local and add getter/setter functions. |
+| E022 | ExportNonConstantInitializerError | A top-level `immut`/`pub immut` (or `export immut`) initializer is not a literal, or is missing. | Write the literal value: `pub immut total: int = 20;`. |
+| E023 | ExportOutsideTopLevelError | `export` (or `pub`) on a constant written inside a function body. | Move to top level, or drop the modifier for a local `immut`. |
 | E150 | SizeParameterError | Size parameter `N: size` on a struct, method or operator; a kind other than `size`; `N` used as a type; a value parameter named `N`; `N` assigned (`N = 3`, `N++`, `&N`). | Free generic functions only: `fn<T, N: size> f(a: T[N])`; use `N` as a length (`0..N`, `T[N]`); copy first: `mut n: int = N;`. |
 | E151 | LocalGenericStructError | A struct declared inside a function has type parameters (`struct Box<T>` in a function body). | Move the generic struct to the top level, or give the local struct concrete field types. |
 | E024 | ImportSymbolCollisionError | Two `import mod::name;` bring in the same bare name. | Qualify calls (`shapes::area(...)`) or narrow with `import geometry::[perimeter];`. |
@@ -153,7 +166,7 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 | E050 | NoConstructorDefinedError | `Type::new(...)` on a struct with no `.new` constructor. | Write `fn Point.new(...): void { ... }` or use `Point::default()`. |
 | E051 | ReservedConstructorNameError | User-written `fn Point.default()`; name reserved for auto-generated one. | Delete it and use `Point::default()`, or rename it to `.new` with parameters. |
 | E052 | StaticMethodCalledOnInstanceError | `static` method called with `.` on an instance. | Call on the type: `Point::origin()`. |
-| E053 | StaticOutsideStructError | `static` on a free function not bound to a struct. | Delete `static`, or make it a method: `fn Point.add(...) static: int`. |
+| E053 | StaticOutsideStructError | `static` on a free function not bound to a struct. | Delete `static`, or make it a method: `static fn Point.add(...): int`. |
 | E060 | ImmutableAssignmentError | Assignment to an `immut` variable. | Declare it `mut`, or use a new variable instead of reassigning. |
 | E061 | InvalidAssignmentTargetError | Assignment target is not a variable, field or array element, e.g. `(x + 1) = 5;`. | Assign to a variable, `p.x` or `arr[i]`; check for `=` versus `==` mix-up. |
 | E069 | StructLayoutCycleError | Struct contains itself by value (directly, in a cycle, or via array). | Make one field a pointer or reference: `next: Node*`, `&Node` or `&?Node`. |
@@ -161,7 +174,7 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 | E080 | OperatorOrphanRuleError | `operator` declared on two types the module does not own. | Move it to the module owning a type, or use a named function like `fn add_vecs(...)`. |
 | E084 | CallerLocationOutsideMarkedFunctionError | `caller_location` used in a function not marked `@caller_location`. | Put `@caller_location` on the line before `fn`, or remove the use. |
 | E085 | AmbiguousTypeReferenceError | Bare type name could mean local type or imported one (`import shapes::[*];` plus own `Point`). | Import only needed names (`import shapes::[Circle, area];`) and write `shapes::Point` qualified. |
-| E087 | MisplacedVisibilityError | `pub`/`public` placed where it does nothing (operator, import, parameter, local, `export`) or used as a name. | Remove `pub` there; put it before top-level `fn`/`struct`/`enum`/`error`/`machine`/`extern fn` or a field. |
+| E087 | MisplacedVisibilityError | `pub`/`public` placed where it does nothing (operator, import, parameter, local, `export`) or used as a name; also a top-level `mut` (module variables are constants), `static pub fn` (order is `pub static fn`) and `pub` before `export`. | Remove `pub` there; put it before top-level `fn`/`static fn`/`struct`/`enum`/`error`/`machine`/`extern fn`, a module constant's `immut`, or a field. A top-level `mut` becomes `immut`; `static pub` becomes `pub static` (both have a `Fix:`). |
 | E088 | PrivateSymbolAccessError | Using another module's non-`pub` function, type, field or method (e.g. `util::helper()`). | Add `pub` in that module's file (`pub fn helper()`) or use its public API. |
 | E089 | PrivateInPublicError | `pub` function, method or field mentions a non-`pub` type (parameter, return, `!T`, generic arg). | Make the type `pub` (`pub struct Hidden`), or remove `pub` from the leaking item. |
 | E090 | AmbiguousModuleError | Module name matches more than one file (e.g. local `list.tr` vs stdlib `list`). | Rename one file, e.g. `my_list.tr`, and import by the new name. |
@@ -169,14 +182,14 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 | E096 | ErrorPayloadError | Error variant payload wrong: bad declaration, wrong argument count/type, bare variant with fields as value. | Pass one argument per field in order (plus optional trailing `string` message); read payload via `compare`. |
 | E097 | GenericOperatorError | Generic `operator<T>` whose type parameter is not tied to operands, or all operands bare `T`. | Mention `T` in an operand and make one operand a type you own: `operator<T> [](p: Cell<T>, i: int): T`. |
 | E112 | VoidTypeNotAllowedError | `void` used as the type of a variable, field or parameter. | Use a real type; `void` only as return type; use `ptr` or `void*` for untyped pointers in extern code. |
-| E113 | RemovedSyntaxError | Removed old syntax: `Point { x: 1, y: 2 }` literal or `fn Point::origin()`. | Use `Point::new(1, 2)` / `Point::default()`; declare `fn Point.origin() static: Point`. |
+| E113 | RemovedSyntaxError | Removed old syntax: `Point { x: 1, y: 2 }` literal or `fn Point::origin()`. | Use `Point::new(1, 2)` / `Point::default()`; declare `static fn Point.origin(): Point`. |
 | E114 | DuplicateMemberError | Same member name twice in a struct, enum, error or machine (duplicate field, variant, transition). | Rename or delete the duplicate member. |
 | E115 | InvalidOperatorDeclarationError | `operator` declared with wrong operand count for its symbol. | Match arity: binary operators take two parameters, `!`/`~` one, `[]` takes `(self, index)`. |
 | E116 | ExternFunctionBodyError | `extern fn` written with a `{ ... }` body. | End with a semicolon: `extern fn malloc(size: int): ptr;`, or drop `extern` to define it. |
 | E117 | InvalidErrorDeclarationError | `error` declaration mixing bare `;` form with a `{ ... }` variant list. | Pick one: `error NotFound;` or `error IOError { NotFound, Closed }`. |
 | E119 | MissingEntryPointError | No `main` function in the compiled file (missing, misspelled, or file is a module). | Define `fn main(): int { return 0; }`; for a module use `turf check --module file.tr`. |
 | E128 | MissingInitializerError | `immutable` without value, or `guess` without initializer or in parameter, return type or field; also an array of non-null references `(&T)[N]` or an unsized local `T[]` with no initializer. | Give a value: `mut x: guess = 5;`; otherwise write the type: `mut x: int;`. |
-| E129 | NothingToInferError | `guess` initializer has no usable type (`null`, void call, `List::default()`), or generic `T` unused in parameters; or a size parameter `N` that no array argument or target type fixes (`mut d = fill(0);`). | State the type: `mut a: &?Point = null;`, `List<int>`, `mut d: int[4] = fill(0);`; use `T` in a parameter. |
+| E129 | NothingToInferError | `guess` initializer has no usable type (`null`, void call, `List::default()`), or generic `T` unused in parameters; or a size parameter `N` that no array argument or target type fixes (`mut d = fill(0);`). | State the type: `mut a: &?Point = null;`, `List<int>::default()`, `mut d: int[4] = fill(0);`; use `T` in a parameter. |
 | E136 | InvalidModuleQualifierError | Two module names in a row, e.g. `mem::io::printline`. | Use the module that has the function: `io::printline("hi")`. |
 | E138 | MissingTypeArgumentsError | Generic type used without type arguments, e.g. `mut b: Box = ...`, or `Box::default()` used directly as a receiver (`Box::default().get()`), where nothing says which `Box`. | Give type arguments: `Box<int>`; methods of generic structs repeat parameters: `fn<T> Box.get(): T`. |
 | E145 | ModuleNotImportedError | `module::name` spelled in a file that never imported the module itself. | Add the exact import the error prints, e.g. `import list;`; `import list::List;` does not allow `list::List`. |
@@ -187,6 +200,9 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 | E153 | UnreachableStateWarning | Warning: a `machine` state no `->` edge leads into (expected for the start state). | Add the missing edge, or allow the warning for a start state. |
 | E172 | DeprecatedUseWarning | Warning: a call to a `fn` or `extern fn` marked `@deprecated("msg")`; the message is shown. | Call what the message names; allow it for a whole build with `--allow E172`. |
 | E173 | TestFunctionUseError | A function marked `@test` is called or used as a value; every build leaves tests out of the program. | Move the shared steps into an ordinary function and call that from both; run a test with `turf test`. |
+| E178 | UnusedPrivateFunctionWarning | Warning (starts at `allow`): a private function or method nothing in its file calls, names as a value or calls through UFCS. `main`, operators, `extern fn`, `@test` and the stdlib are exempt. | Remove it, call it, or mark it `pub` if another module should. |
+| E179 | UnusedImportWarning | Warning (starts at `allow`): an `import` nothing in its file uses. Prelude modules are never reported. | Remove the line (the `Fix:` does). |
+| E180 | UnusedPubInBinaryWarning | Warning (starts at `allow`): a `pub` function in a program's root file (the one with `main`) that nothing calls; nothing imports that file. | Remove it or call it. A library module's `pub` functions are never reported. |
 
 ## FUNCTION_SIGNATURE (Function signature)
 
@@ -194,7 +210,7 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 |---|---|---|---|
 | E025 | ModuleArityOrTypeError | Module function exists but no overload accepts the argument types, e.g. `math::abs(true)`. | Pass a supported type (`int` or `double` for `math::abs`) or convert the value first. |
 | E038 | NestedFunctionError | `fn` declared inside another function body. | Move it to top level, or make it a struct method `fn S.name(...)`. |
-| E044 | WrongArityError | Call has an argument count no overload accepts, e.g. `add(2, 3, 4)`. | Match one of the "Known overloads" the error prints; for `static` methods called with `.`, use `::`. |
+| E044 | WrongArityError | Call has an argument count no overload accepts, e.g. `add(2, 3, 4)`. | Match one of the overloads the error prints (the snippet marks the candidate); apply the `Fix:` when shown (a variable named like the missing parameter is passed, or the one argument whose removal fits is dropped); for `static` methods called with `.`, use `::`. |
 | E047 | DefaultConstructorArityError | Arguments passed to `Type::default()`. | Call `Point::default()` with no args, or use `Point::new(1, 2)`. |
 | E067 | VoidValueError | Result of a `: void` function used as a value. | Call it as a statement, or change its return type and add a `return`. |
 | E125 | AmbiguousCallError | Two visible definitions (functions or operators) fit the call equally well. | Drop one import, import only needed names (`import a::[f];`), call `a::f(n)`, or rename. |
@@ -207,11 +223,19 @@ Turf compiler diagnostics carry stable identifiers `E001` through `E173`: a code
 |---|---|---|---|
 | E017 | DoubleFreeError | Same pointer passed to `mem::free` twice. | Free once; set `buf = null;` after freeing. |
 | E018 | UseAfterFreeError | Pointer read or written after `mem::free` on it. | Use the memory before `mem::free(buf)`; null the pointer after freeing. |
-| E081 | PossibleNullDereferenceError | Field or method use on a `&?T` not proven non-null. | Check first: `if b != null { return b.val; }`; copy fields/calls into a variable before checking. |
+| E081 | PossibleNullDereferenceError | Field or method use on a `&?T` not proven non-null. | Check first: `if b != null { return b.val; }`. A field path (`n.next`) can be checked the same way until the next call or write to a field of that name; store call results in a variable first. |
 | E086 | DanglingReferenceEscapeError | Reference to a local (`&n`) returned or stored where it outlives the function. | Copy to the heap: `return heap(n);`. |
 | E130 | RawPointerOutsideUnsafeError | Raw pointer (`ptr`, `int*`) used outside `unsafe`, in a non-extern signature, or reference cast. | Wrap in `unsafe { ... }`, or use `&T` / `&?T`; only `extern fn` may take raw pointers. |
 | E170 | PossibleUseAfterFreeWarning | Warning: a pointer used after `free` on some paths but not all (only `@ownership`-annotated allocators). | Use the pointer before any path releases it; release it once, at the end. |
 | E171 | PossibleDoubleFreeWarning | Warning: a pointer freed again after a release on some paths but not all. | Release the pointer on exactly one path. |
+| E187 | ManualHeapLeakWarning | Warning (starts at `allow`): memory from `mem::alloc` (or any `@ownership(acquires)` function) that nothing frees and nothing lets out. | `defer mem::free(buf);` right after the allocation. Memory stored in a field or array, passed to a call that may keep it or converted is not reported. |
+| E188 | RawPointerMaybeNullWarning | Warning (starts at `allow`): a raw pointer that may be null is dereferenced (`mem::malloc` result used without a test). | Test it for `null` first, or use `mem::alloc` (stops instead of returning null), `&x` or `self`. |
+| E189 | FreeOfNonHeapPointerWarning | Warning (starts at `allow`): `mem::free` of the address of a variable or other memory no allocation returned. | Free only what an allocation returned; a variable's memory is released with its function. |
+| E190 | WriteThroughImmutableArrayWarning | Warning (starts at `allow`): a write through a pointer made from an `immut` array. | Declare the array `mut` if it is meant to change. |
+| E191 | UncheckedPointerIndexWarning | Warning (starts at `allow`): `p[i]` on a raw pointer where no bound on `i` is visible. | Make the bound visible (`for i in 0..10` over a 10-element allocation) so the index provably stays inside. |
+| E192 | IntToPointerCastWarning | Warning (starts at `allow`): an integer converted to a pointer (`4096 to int*`). | Get the pointer from what it points to (`&x`, an allocation) or write `null`. |
+| E193 | UnneededUnsafeBlockWarning | Warning (starts at `allow`): an `unsafe { }` block that holds no raw-pointer declaration, cast or dereference. | Remove the `unsafe { }` and keep its statements. |
+| E194 | LargeUnsafeBlockWarning | Warning (starts at `allow`): an `unsafe { }` block of more than 40 statements, nested blocks included. | Keep only the raw-pointer operations inside it; move the rest out or into a function. |
 
 ## GENERAL (General)
 
@@ -387,6 +411,11 @@ fn good(b: &?Box): int {
     if b != null { return b.val; }
     return 0;
 }
+// a field path is checked the same way (until the next call)
+fn second(n: &Node): int {
+    if n.next != null { return n.next.val; }
+    return 0;
+}
 ```
 
 ### E128 MissingInitializerError: Variable with no starting value
@@ -409,7 +438,7 @@ mut a: guess = null;
 mut c: guess = List::default();
 // right
 mut a: &?Point = null;
-mut c: List<int> = List::default();
+mut c: List<int> = List<int>::default();
 ```
 
 ### E110 ExpectedKeywordError: A specific word or symbol is missing (message names it)
@@ -510,6 +539,6 @@ mut p: Point = Point::default();
 mut b: Box = Box::default();
 mut v: int = Box::default().get();
 // right
-mut b: Box<int> = Box::default();
+mut b: Box<int> = Box<int>::default();
 mut v: int = b.get();
 ```
