@@ -14,6 +14,7 @@ struct Money {
 }
 
 fn Money.new(cents: int): void { self.cents = cents; }
+static fn Money.zero(): Money { return Money::new(0); }   // static: no self, called Money::zero()
 
 operator +(a: Money, b: Money): Money { return Money::new(a.cents + b.cents); }
 operator ==(a: Money, b: Money): bool { return a.cents == b.cents; }
@@ -64,7 +65,7 @@ fn apply_cmd(d: Door, c: Cmd): Door {
 }
 
 fn main(): int {
-    mut st: Stack<string> = Stack::default();
+    mut st: Stack<string> = Stack<string>::default();
     st.push("a");
     st.push("b");
     mut popped: string = "";
@@ -73,11 +74,11 @@ fn main(): int {
     }
     printline(popped);                          // ba
 
-    mut wallet: List<Money> = List::default();
+    mut wallet: List<Money> = List<Money>::default();
     wallet.push(Money::new(250));
     wallet.push(Money::new(1999));
     wallet.push(Money::new(5));
-    mut total: Money = Money::new(0);
+    mut total: Money = Money::zero();
     for i in 0..wallet.length() {
         total += wallet[i];                     // += uses operator +
     }
