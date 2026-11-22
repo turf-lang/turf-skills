@@ -60,6 +60,7 @@ turf clean            → delete build/
 turf audit            → per package and stdlib: files, `unsafe module;`, `unsafe { }`, `extern fn`, C libraries, whether `[unsafe] allow` grants it
 turf graph --unsafe   → the package graph JSON plus each package's unsafe surface
 turf run file.tr      → run one file on its own, outside the package
+turf upgrade [--check] [--version V]  → (turf 1.2.0+) move the install (turf, turfc, stdlib) to the latest or the named release: runs that release's own installer after checking it against `checksums.txt`; `--check` installs nothing; only for an install made by `install.sh`/`install.ps1`
 ```
 
 Debug and release builds: `-O0 -g` for debugging, the default `-O2` for release. All runtime checks stay in both.
@@ -88,7 +89,7 @@ fn helper(): int { return 1; }      // private: invisible to other modules
 - Mark every function, method, type, error, machine, `extern fn` **and field** that callers need with `pub`. Leave everything else private.
 - A `pub` signature cannot mention a non-`pub` type (E089).
 - Operators have no `pub`; they follow their types.
-- Constants: `export immut MAX: int = 10;`.
+- Constants: `pub immut MAX: int = 10;` (another module reads it as `m::MAX`). A plain top-level `immut MAX: int = 10;` is private to its module; from elsewhere it is E088. (`export immut` is the old spelling, warning E176.)
 - `turf migrate pub --write mod.tr` adds `pub` everywhere (the 1.x behaviour). Afterwards, remove it from internals.
 - Check a module alone with `turf check --module src/geometry.tr`.
 

@@ -7,11 +7,11 @@ Turf has no classes, inheritance, interfaces, exceptions, closures, iterators, t
 | Source concept | Turf |
 |---|---|
 | `let x = 1` / `int x = 1` / `x := 1` | `mut x: int = 1;` (or `immut` if it never changes) |
-| `const` / `static final` | `immut` local, or top-level `export immut NAME: int = 10;` (literal values only) |
+| `const` / `static final` | `immut` local, or top-level `pub immut NAME: int = 10;` (literal values only; without `pub` it is private to its module) |
 | `class` with fields + methods | `struct` + `fn Type.method(...)` (implicit `self` by reference) |
 | constructor | `fn Type.new(args): void { self.f = ...; }` called `Type::new(args)` (must set every field) |
 | default / zero object | `Type::default()` |
-| static method / class method | `fn Type.m(...) static: R`, called `Type::m(...)` |
+| static method / class method | `static fn Type.m(...): R`, called `Type::m(...)` |
 | object literal `{x: 1, y: 2}` | `mut p: P = P::default(); p.x = 1; p.y = 2;` or `P::new(1, 2)` (no struct literals) |
 | inheritance | composition: embed the "base" struct as a field; forward methods explicitly |
 | interface / trait / virtual dispatch | (a) an `enum` tag + `compare` (closed set); (b) a struct holding function values `fn(...)` (open set); (c) generic `fn<T>` taking the operation as a parameter |
@@ -66,7 +66,7 @@ Turf has no classes, inheritance, interfaces, exceptions, closures, iterators, t
 | bit fields / packed structs | plain `int` fields + masks; `sizeof` includes padding |
 | `goto`, labeled break | restructure: extract a function and `return`, or use a flag (there are no labels) |
 | macros / templates | functions, generics |
-| global mutable variables | none (only `export immut` constants): pass state explicitly, usually in a struct by `&` |
+| global mutable variables | none (only `immut` module constants): pass state explicitly, usually in a struct by `&` |
 
 ## 2. Patterns worth copying
 
@@ -81,14 +81,14 @@ struct Shape {
     b: double
 }
 
-fn Shape.circle(r: double) static: Shape {
+static fn Shape.circle(r: double): Shape {
     mut s: Shape = Shape::default();
     s.kind = ShapeKind::Circle;
     s.a = r;
     return s;
 }
 
-fn Shape.rect(w: double, h: double) static: Shape {
+static fn Shape.rect(w: double, h: double): Shape {
     mut s: Shape = Shape::default();
     s.kind = ShapeKind::Rect;
     s.a = w;
@@ -246,6 +246,19 @@ Return `!T` (with an error such as `error NotFound;`) and let the caller choose 
     - qualified `typeof` strings;
     - `+=` using user operators;
     - `mem::free` of GC memory panics.
+
+### Turf 2.0-2.2 → 2.3
+
+Every retired spelling still compiles to the same program and warns, starting at `allow`. To find them, run `turf check --warn E174 --warn E175 --warn E176 --warn E177`; each warning carries a `Fix:` (`--smart-write-fix=<path>` writes the program with them all applied). Write the new form:
+
+| Old | New | Warning |
+|---|---|---|
+| `fn T.m(p: int) static: R` | `static fn T.m(p: int): R` (`pub static fn`) | E175 |
+| `export immut NAME: int = 1;` | `pub immut NAME: int = 1;` (a plain `immut NAME` is private to its module) | E176 |
+| `1.5.floor()`, `2.0.f()` | `(1.5).floor()` | E174 |
+| `mut b: Box<int> = Box::default();` | `mut b: Box<int> = Box<int>::default();` | E177 |
+
+`function` can stand for `fn` where a declaration starts; write `fn`. Dead code that 2.3 can now point out (opt-in: E178 unused private function, E179 unused import, E180 unused `pub` in the program's root file) is worth deleting after a port.
 
 ## 5. Porting out of Turf
 

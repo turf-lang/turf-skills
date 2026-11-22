@@ -255,7 +255,7 @@ Error: `error MathError { DivisionByZero }`.
 
 ## list   (`import list::List;`)  `List<T>`
 
-Growable array. `mut l: List<int> = List::default();`. **Gotchas:** `for x in l` is E005; iterate by index (`while i < l.length()`). `l[i].f = v` / `l[i].method-that-assigns-self()` is E098: do `mut e: T = l[i]; e.f = v; l[i] = e;` (but `grid[i][j] = v` and `outer[i].push(v)` are fine, elements that are collections are handles). Fields private (E088).
+Growable array. `mut l: List<int> = List<int>::default();`. **Gotchas:** `for x in l` is E005; iterate by index (`while i < l.length()`). `l[i].f = v` / `l[i].method-that-assigns-self()` is E098: do `mut e: T = l[i]; e.f = v; l[i] = e;` (but `grid[i][j] = v` and `outer[i].push(v)` are fine, elements that are collections are handles). Fields private (E088).
 
 | Signature | Notes |
 |---|---|
@@ -281,7 +281,7 @@ fn by_age(a: Person, b: Person): int { return a.age - b.age; }
 fn is_adult(p: Person): bool { return p.age >= 18; }
 
 fn main(): int {
-    mut l: List<int> = List::default();
+    mut l: List<int> = List<int>::default();
     l.push(1); l.push(2); l.push(3);
     l[1] = 20;
     l.set(2, 30);
@@ -290,7 +290,7 @@ fn main(): int {
     mut c: List<int> = l.copy();      // independent; `= l` would share
     c.push(4);
 
-    mut people: List<Person> = List::default();
+    mut people: List<Person> = List<Person>::default();
     people.push(Person::new("ada", 36));
     people.push(Person::new("kid", 9));
     people.sort(by_age);              // kid, ada
@@ -301,14 +301,14 @@ fn main(): int {
 ```
 
 ## stack   (`import stack::Stack;`)  `Stack<T>`
-`push(item: T): void`; `pop(): T` (panics if empty); `peek(): T` (panics if empty); `length(): int`; `copy(): Stack<T>`. Create `Stack::default()`.
+`push(item: T): void`; `pop(): T` (panics if empty); `peek(): T` (panics if empty); `length(): int`; `copy(): Stack<T>`. Create `Stack<T>::default()`, e.g. `Stack<int>::default()`.
 
 ## queue   (`import queue::Queue;`)  `Queue<T>`
-`enqueue(item: T): void`; `dequeue(): T` (panics if empty); `peek(): T` (panics if empty); `length(): int`; `copy(): Queue<T>`. Create `Queue::default()`.
+`enqueue(item: T): void`; `dequeue(): T` (panics if empty); `peek(): T` (panics if empty); `length(): int`; `copy(): Queue<T>`. Create `Queue<T>::default()`, e.g. `Queue<int>::default()`.
 
 ## map   (`import map::Map;`)  `Map<K, V>`
 
-Hash map. `mut m: Map<string, int> = Map::default();`. Keys: int/char/bool/enum/double by value (`-0.0`==`0.0`; NaN never found); string by CONTENT; struct needs `operator ==` (else E011) and `a == b` must imply same hash; arrays cannot be keys.
+Hash map. `mut m: Map<string, int> = Map<string, int>::default();`. Keys: int/char/bool/enum/double by value (`-0.0`==`0.0`; NaN never found); string by CONTENT; struct needs `operator ==` (else E011) and `a == b` must imply same hash; arrays cannot be keys.
 
 | Signature | Notes |
 |---|---|
@@ -338,7 +338,7 @@ fn lookup(m: Map<string, int>, key: string): int {
 }
 
 fn main(): int {
-    mut m: Map<string, int> = Map::default();
+    mut m: Map<string, int> = Map<string, int>::default();
     m.put("a", 1);
     m.put("a", 100);                                    // still one entry
     immut x: int = m.try_get("a") recover produce -1;   // 100
@@ -349,7 +349,7 @@ fn main(): int {
 ```
 
 ## set   (`import set::Set;`)  `Set<T>`
-Same key rules as Map. `Set::default()`.
+Same key rules as Map. `Set<T>::default()`, e.g. `Set<string>::default()`.
 
 | Signature | Notes |
 |---|---|
@@ -574,13 +574,13 @@ IPv4 TCP only; calls block, no timeouts. Addresses are four int octets (`connect
 | Signature | Notes |
 |---|---|
 | `resolve_hostname(host: string): !string` | first IPv4 as dotted text; `ResolutionFailed` |
-| `TcpConnection::connect(a: int, b: int, c: int, d: int, port: int) static: !TcpConnection` | errors `SocketCreationFailed`, `ConnectionRefused` (any connect failure); octets mod 256 |
+| `TcpConnection::connect(a: int, b: int, c: int, d: int, port: int): !TcpConnection` (static) | errors `SocketCreationFailed`, `ConnectionRefused` (any connect failure); octets mod 256 |
 | `TcpConnection.read(max_bytes: int): string` | blocks; one receive, may be partial; `""` on peer close/failure; ends at first NUL |
 | `TcpConnection.write(data: string): void` | failure silent |
 | `TcpConnection.close(): void` | idempotent |
 | `TcpConnection.raw_fd(): int` | `-1` once closed |
 | `TcpConnection::new(fd: int)` | wrap a descriptor you own |
-| `TcpListener::bind(port: int) static: !TcpListener` | errors `SocketCreationFailed`, `BindFailed`, `ListenFailed`; sets SO_REUSEADDR, backlog 128 |
+| `TcpListener::bind(port: int): !TcpListener` (static) | errors `SocketCreationFailed`, `BindFailed`, `ListenFailed`; sets SO_REUSEADDR, backlog 128 |
 | `TcpListener.accept(): !TcpConnection` | `AcceptFailed` (usually transient: `recover run { continue; }`) |
 | `TcpListener.close(): void`, `TcpListener.raw_fd(): int`, `TcpListener::new(fd: int)` | as for TcpConnection |
 
