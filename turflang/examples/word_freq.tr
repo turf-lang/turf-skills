@@ -26,7 +26,7 @@ fn is_letter(c: char): bool {
 
 // Split on anything that is not a letter, lower-casing as we go.
 fn words_of(text: string): List<string> {
-    mut out: List<string> = List::default();
+    mut out: List<string> = List<string>::default();
     mut current: strings::StringBuilder = strings::StringBuilder::default();
     for i in 0..text.length() {
         immut c: char = text[i];
@@ -47,14 +47,14 @@ fn main(): int {
     immut text: string = "The cat and the hat. The CAT sat; a hat is a hat!";
     immut words: List<string> = words_of(text);
 
-    mut counts: Map<string, int> = Map::default();
+    mut counts: Map<string, int> = Map<string, int>::default();
     for i in 0..words.length() {
         immut w: string = words[i];
         immut seen: int = counts.try_get(w) recover produce 0;
         counts[w] = seen + 1;
     }
 
-    mut entries: List<Entry> = List::default();
+    mut entries: List<Entry> = List<Entry>::default();
     immut keys: List<string> = counts.keys();
     for i in 0..keys.length() {
         entries.push(Entry::new(keys[i], counts[keys[i]]));

@@ -38,7 +38,7 @@ fn parse_all(text: string): !List<Setting> {
     if strings::trim(text) == "" {
         return ConfigError::Empty("config text was blank");
     }
-    mut out: List<Setting> = List::default();
+    mut out: List<Setting> = List<Setting>::default();
     immut lines: List<string> = strings::split(text, "\n");
     for i in 0..lines.length() {
         if strings::trim(lines[i]) == "" {

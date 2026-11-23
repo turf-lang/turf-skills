@@ -1,13 +1,13 @@
 ---
 name: turflang
-description: Write, read, debug, fix, test and port code in TurfLang (Turf), the statically typed LLVM-compiled language with `.tr` files, `turf`/`turfc` compilers, `turf.toml` projects and the `--smart` local-model diagnostics. Use whenever a task touches `.tr` files, Turf syntax, Turf compile errors (E001–E151), runtime panics, the Turf standard library, `turf test`, or rewriting code into or out of Turf.
+description: Write, read, debug, fix, test and port code in TurfLang (Turf), the statically typed LLVM-compiled language with `.tr` files, `turf`/`turfc` compilers, `turf.toml` projects and the `--smart` local-model diagnostics. Use whenever a task touches `.tr` files, Turf syntax, Turf compile errors (E001–E197), runtime panics, the Turf standard library, `turf test`, or rewriting code into or out of Turf.
 ---
 
 # TurfLang
 
 Turf is not C, Rust, Go or Python, even where it looks like them. Most mistakes agents make come from guessing syntax from those languages. This skill gives you the real rules. **Do not guess Turf syntax; check it here or in `references/`.**
 
-Turf 2.2: static types, ahead-of-time compiled through LLVM, garbage-collected heap, checked references (`&T`, `&?T`), real monomorphized generics, error unions (`!T` with `recover`/`try`), `compare` pattern matching, `machine` state machines, and checked arithmetic and indexing. Release builds keep every runtime check.
+Turf 2.3: static types, ahead-of-time compiled through LLVM, garbage-collected heap, checked references (`&T`, `&?T`), real monomorphized generics, error unions (`!T` with `recover`/`try`), `compare` pattern matching, `machine` state machines, and checked arithmetic and indexing. Release builds keep every runtime check.
 
 ## Files in this skill
 
@@ -19,7 +19,7 @@ Turf 2.2: static types, ahead-of-time compiled through LLVM, garbage-collected h
 | `references/diagnostics.md` | A compile fails or a program panics. Covers the fix loop, how to read a diagnostic, `--smart`, warnings and their lint levels, and runtime panics. |
 | `references/error-codes.md` | You have an `E0NN` code and want its meaning and usual fix. |
 | `references/projects-and-testing.md` | Working in a `turf.toml` project: layout, imports across modules and packages, dependencies, `turf test` conventions. |
-| `references/porting.md` | Translating code from C/C++/Rust/Go/Python/JS/Java into Turf (or back), or upgrading Turf 1.x code. |
+| `references/porting.md` | Translating code from C/C++/Rust/Go/Python/JS/Java into Turf (or back), or upgrading Turf 1.x or 2.x code to 2.3. |
 | `examples/*.tr`, `examples/inventory/` | You want a complete, compiling program to copy patterns from. All of them were compiled and run. |
 
 ## The working loop
@@ -37,14 +37,15 @@ Exit statuses: 0 means success, 1 means a reported problem (compile error, faile
 
 ### Compiler fixes, diagnostics and `--smart`
 
-* **The compiler's own diagnostics are the source of truth** and need nothing extra. Each one has a stable code `[E0NN · category]`, a plain-language message, `Note:` lines pointing at related places, often a `Hint:` with the exact fix, and a caret under the offending token. "Did you mean" hints for misspelled names are reliable: they come from edit distance over names actually in scope.
+* **The compiler's own diagnostics are the source of truth** and need nothing extra. Each one has a stable code and name `[E0NN · name]` (`[E040 · unknown name]`), a plain-language message that starts "I cannot ..." or "I expected ...", `Note:` lines pointing at related places, often a `Hint:` with the exact fix, and a snippet whose labelled spans (`^~~~` primary, `---` secondary) say what each underlined piece is. "Did you mean" hints for misspelled names are reliable: they come from edit distance over names actually in scope.
 * **A `Fix:` block is a compiler-checked edit** (TurfLang 2.1.0 and later, every build, no flag, no model). When an error has exactly one right edit, the diagnostic ends with it:
   ```text
     Fix: replace 'countr' with 'counter'
     3 │     counter += 1;
       │     ~~~~~~~
   ```
-  Before printing it, the compiler applied the edit to a copy of the program and checked it again: the error is gone and no new error appeared. **Apply it as written**, then re-check. It covers a misspelled name with one close match (variable, function, method, field, type, enum variant, module symbol, keyword), `.` vs `::`, a stray `static` or `pub`, `immut` → `mut` at the declaration of a variable you assign to, a missing `;` and a generic method's missing `<T>`. No `Fix:` means more than one edit is plausible: the `Hint:` names the candidates, and you choose.
+  Before printing it, the compiler applied the edit to a copy of the program and checked it again: the error is gone and no new error appeared. **Apply it as written**, then re-check. It covers a misspelled name with one close match (variable, function, method, field, type, enum variant, module symbol, keyword), `.` vs `::`, a stray `static` or `pub`, `immut` → `mut` at the declaration of a variable you assign to, a missing `;`, a generic method's missing `<T>`, a call with one argument too many (when exactly one removal fits) or too few (a variable named like the missing parameter: `pass 'b' as argument 2`), and a function with no return type (`declare the return type ': void'`). Some warnings carry a `Fix:` too (E174-E177, E179). No `Fix:` means more than one edit is plausible: the `Hint:` names the candidates, and you choose.
+  * **A `Fix:` can be `plausible`.** The compiler scores each fix on what the edit does. When it deletes calls or `return`s, changes another declaration, adds `unsafe`/`mem::`/`fs`/`os` use, adds a warning, rewrites many tokens, or is one of several that pass, a `Check before applying: ...` line under the `Fix:` says why. Read that line before applying. A fix without it is `proven` (the compiler's) or `verified` (the model's).
   * It never edits your source. `--smart-write-fix=<path>` (any build, with `turf check`, `turf file.tr` or `turfc`) writes the whole program with every shown `Fix:` applied to `<path>`; diff it and copy it over.
   * Compiles is not the same as correct: a rename to the one close name is almost always the intent, but check it when two variables have similar names.
 * **`--smart`** (`turf file.tr --smart`) is for an error **without** a `Fix:`. When the compiler has a fix, `--smart` shows that and never calls the model. Otherwise it sends the *first* error to a small local language model (llama.cpp, no network). Any suggested fix is applied to an isolated sandbox copy and kept **only if the error disappears and no new error appears**. Otherwise you see the normal diagnostic, unchanged. Up to 3 attempts, each retried with compiler feedback.
@@ -60,6 +61,8 @@ Exit statuses: 0 means success, 1 means a reported problem (compile error, faile
 import list::List;              // stdlib modules other than the prelude need an import
 import map::Map;
 
+immut STEP: int = 2;            // module constant: private to its module; `pub immut` shares it
+
 struct Point { x: int, y: int }                 // fields: name: Type, comma-separated
 
 fn Point.new(x: int, y: int): void {            // constructor = method named `new`
@@ -67,7 +70,7 @@ fn Point.new(x: int, y: int): void {            // constructor = method named `n
     self.y = y;
 }
 fn Point.len2(): int { return self.x * self.x + self.y * self.y; }   // method, implicit self (by reference)
-fn Point.origin() static: Point { return Point::default(); }        // static method: `static` before `:`
+static fn Point.origin(): Point { return Point::default(); }        // static method: `static` before `fn` (`pub static fn` when public)
 
 enum Color { Red, Green, Blue }
 
@@ -84,7 +87,7 @@ fn main(): int {                                // main returns int (exit status
     mut n: int = 5;                             // mut = reassignable, immut = not
     immut name = "turf";                        // type inferred (string); `: guess` is the same
     n = n + 1;                                  // reassign: no keyword, no type
-    n += 2; n++;
+    n += STEP; n++;
 
     immut d: double = n to double;              // ALL conversions use `to`
     immut label: string = "n=" + (n to string); // + needs strings on both sides; parenthesize `to`
@@ -118,10 +121,10 @@ fn main(): int {                                // main returns int (exit status
         return 1;                               // `return` here would leave main, not the recover
     };
 
-    mut xs: List<int> = List::default();        // the declared type supplies <int>
+    mut xs: List<int> = List<int>::default();   // type arguments are written where the value is built
     xs.push(v);
     for i in 0..xs.length() { n += xs[i]; }     // iterate collections by index
-    mut ages: Map<string, int> = Map::default();
+    mut ages: Map<string, int> = Map<string, int>::default();
     ages["ada"] = 36;
 
     printline(name + " " + label + " " + size + " " + (d to string) + " " + (w to string));
@@ -150,14 +153,16 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
 - `**` is power: `int ** int` gives an exact `int`, and a `double` on either side gives a `double`. `-2 ** 2` is `4`. `^` is XOR.
 - Integer overflow, division by zero and an out-of-range `double to int` **panic** at run time; nothing wraps. A constant expression that overflows is a compile error (E076).
 - Structs have no `==` or `<` unless you declare `operator ==` (each operator separately). Arrays have no `==`. Enums support `==`/`!=` but not `<`.
+- A decimal literal used as a call receiver is written in parentheses: `(1.5).floor()`, not `1.5.floor()` (warning E174; `1.twice()` needs none).
 - `string + string` concatenates. A string plus anything else is E057.
 
 **Control flow**
 - Every `if`/`elseif`/`else`/`while`/`for`/`do` body needs braces. Conditions need no parentheses. Write `elseif` (`else if` also works).
 - A range `for` is `for i in a..b` (end excluded), with an optional `step <expr>` (default `i++`). There is no C-style `for(;;)` and no `..=`. For a descending range, write a decreasing `step`, or the loop never ends.
 - **Reserved words catch ordinary names.** These cannot be variable, parameter, field or function names (E108):
-  - `step`, `run`, `to`, `in`, `as`, `do`, `done`, `give`, `produce`, `recover`, `try`, `error`, `float`, `ptr`, `string`, `self`, `static`, `export`, `extern`, `machine`, `matches`, `compare`, `otherwise`, `operator`, `guess`, `defer`, `public`, `pub`, `unsafe`, `null`, `caller_location`;
-  - plus the type names (`int`, `int32`, `double`, `bool`, `char`, `void`) and the usual keywords.
+  - `step`, `run`, `to`, `in`, `as`, `do`, `done`, `give`, `produce`, `recover`, `try`, `error`, `float`, `ptr`, `string`, `self`, `static`, `export`, `extern`, `machine`, `matches`, `compare`, `otherwise`, `operator`, `guess`, `defer`, `public`, `pub`, `unsafe`, `null`, `sizeof`, `caller_location`;
+  - plus the type names (`int`, `int32`, `double`, `bool`, `char`, `void`, `string`) and the usual keywords (`if else while for return break continue fn struct enum import true false mut mutable immut immutable`).
+  - `function` is **not** reserved: where a declaration starts it is another spelling of `fn`, anywhere else an ordinary name. Always write `fn`. `func`, `def` and `fun` at a declaration start are E014 with a `Fix:` writing `fn`.
   - Typical renames: `from`/`to` → `src`/`dst`, `run` → `invoke`, `step` → `advance`, `string` → `text`.
 - **`compare` syntax:** `compare x { matches P: stmts done ... otherwise: stmts }`. Each `matches` arm ends with `done`. `otherwise` comes last and has **no** `done`.
   - An enum, `bool` or declared error type must be covered completely, or the compare needs an `otherwise:` (E093).
@@ -168,15 +173,16 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
 **Functions, methods, modules**
 - `fn name(a: T, b: U): R { }`. The return type is mandatory (`: void`). A non-void function must return on every path (E009). Nested functions are not allowed, and neither are lambdas or closures. Pass a named function as a value: `fn(int, int): int`.
 - Parameters are **copies**, structs and fixed arrays included. To mutate the caller's value, take `&T` and pass `&v`. Methods receive `self` by reference. An unsized array parameter `T[]` is a view, so writes reach the caller.
-- Methods are declared outside the struct as `fn Type.method(...)`. Methods of a generic struct repeat the type parameters: `fn<T> Box.get(): T` (E138 without them).
+- Methods are declared outside the struct as `fn Type.method(...)`; a static method (no `self`, called `Type::method()`) is `static fn Type.method(...)`. Methods of a generic struct repeat the type parameters: `fn<T> Box.get(): T` (E138 without them).
 - Structs are built only with `T::default()` or `T::new(...)` (when you wrote `fn T.new`). **Struct literals such as `Point { x: 1 }` do not exist** (E113).
 - `::` is for namespaces (modules, enum variants, static methods, constructors), and `.` is for values. `io.printline` is E048, and `p::x` is E029.
 - **Prelude** (no import needed): `int double bool char strings array io math sys`. Functions from `io`, `math` and `sys` can be called bare: `printline`, `print`, `input`, `abs`, `max`, `sqrt`, `exit`, `panic`. Functions from `strings`/`char`/`int`/... are reached as methods (`s.length()`, `c.is_digit()`, `n.abs()`) or qualified (`strings::trim(s)`).
 - Everything else needs `import`: `list map set stack queue json http net fs os time random mem test`.
   - `import list::List;` makes `List` usable bare. `import list;` makes `list::List` available. They are separate grants, so write both if you use both spellings.
   - A file may write `m::` only for modules it imports itself (E145).
-- Across modules, everything is **private unless `pub`**, and that includes struct fields inside a `pub struct` (E088). A `pub` function cannot expose a non-`pub` type (E089). A single-file program needs no `pub`.
-- Generic type arguments are never written at a use site: `identity<int>(3)` and `Box<int>::default()` do not parse (E110). Put the type on the declaration instead: `mut b: Box<int> = Box::default();`. `mut l = List::default();` is E129.
+- A top-level `immut NAME: T = literal;` is a module constant, private to its module. `pub immut NAME: T = literal;` shares it (`module::NAME`). A top-level `mut` is E087.
+- Across modules, everything is **private unless `pub`**, and that includes struct fields inside a `pub struct` and module constants (E088). A `pub` function cannot expose a non-`pub` type (E089). A single-file program needs no `pub`.
+- **Write generic type arguments where the value is built**, after the name for a type and after `::` for a function: `mut b: Box<int> = Box<int>::default();`, `Box<int>::new(1)`, `identity::<int>(3)`. `identity<int>(3)` (no `::`) is two comparisons and does not parse (E110). Leaving them off and relying on the declared type (`mut b: Box<int> = Box::default();`) still compiles but is warning E177; `mut l = List::default();` has nothing to infer from (E129).
 - An array length can be a generic parameter: `fn<T, N: size> fill(v: T): T[N]`. `N` is never written at a call; it comes from an array argument or from the type the result is stored into (`mut z: int[8] = fill(0);`), else E129. Free functions only: on a struct, method or operator, as a type, or assigned, it is E150.
 
 **Errors**
@@ -201,7 +207,7 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
 - Strings are immutable byte strings: `s.length()`, `s[i]` gives a `char`, and `strings::substring(s, start, end)` has an exclusive end. To build a string in a loop, use `strings::StringBuilder` (`append`, `append_char`, `to_string`), not repeated `+`.
 
 **References and memory**
-- `&T` is never null. `&?T` may be null and can only be used after a null check on a **variable**. For a field such as `node.next`, copy it into a local variable and check that (E081).
+- `&T` is never null. `&?T` may be null and can only be used after a null check on a **variable or a field path** (`if n.next != null { return n.next.val; }`). A checked `&?T` is then accepted where a `&T` is expected (argument, return, store). The check on a field lasts until the next function or method call or a write to a field of that name; to keep it across a call, copy it into a local: `immut nx: &Node = n.next;` (E081 reading through it unchecked, E082 passing it as a `&T`).
 - Returning `&local` is E086. Return `heap(local)` instead, which copies the value to the GC heap and gives back a `&T`.
 - A struct cannot contain itself by value (E069). Link nodes through `&?Node`.
 - Raw pointers (`T*`, `ptr`), `extern fn` and pointer casts belong inside `unsafe { }` only. Ordinary functions may not take or return raw pointers (E130). You almost never need them; reach for `&T`/`&?T`, `List`, and `heap()` first.
@@ -227,6 +233,7 @@ Comments are `//` only: there are **no `/* */` block comments** (E103). Statemen
 1. Reproduce: `turf check` for compile errors, `turf run` for behaviour. For runtime panics, the message names `file:line`. Debug with `-O0 -g` plus `gdb`/`lldb` (breakpoints by `file.tr:line`, locals by name), or add `printline` / `io::eprintline` traces (stdout is flushed before a panic message).
 2. Read the diagnostic's `Fix:` (apply it), Hint and Notes. For generic code, the Notes list the instantiation chain from your call down to the failing line inside the library.
 3. Fix the root cause rather than silencing the symptom. No flag disables an error check. A warning has a code (`E163`) and a lint level, so `--allow E163` hides it and `--deny E163` makes it an error (or a `[lints]` table in `turf.toml`); allow one only when the code is right as written. Prefix intentionally unused variables with `_`.
+   - Most warnings added in 2.3 (E174-E194: spellings, unused private function/import/`pub`, `int`→`double` precision, never-ending loops and recursion, manual-heap leaks, unsafe checks) **start at `allow`** and print nothing until you ask. Before handing code over, check it with them on: `turf check --warn E174 --warn E175 --warn E176 --warn E177 --warn E178 --warn E179 --warn E180` (add the others as needed). E195-E197 (empty loop body, empty function body, empty `recover` block) are on by default; put a comment in a body that is empty on purpose. See `references/error-codes.md`.
 4. Add a regression test (`tests/<name>.tr` that exits 0, or a `fail_<name>.tr` with `// EXPECT-DIAG: E0NN` for "must not compile"). See `references/projects-and-testing.md`.
 
 ## Rewriting or porting a codebase
@@ -256,4 +263,5 @@ turf check file.tr --smart-write-fix=fixed.tr   (write the program with every Fi
 turf file.tr --smart [--smart-write-fix=fixed.tr]
 turf add NAME --path ../x | --git URL --tag v1   (project dependencies)
 turf migrate pub [--write] mod.tr   (1.x → 2.0: add pub)
+turf upgrade [--check] [--version V]   (turf 1.2.0+: move the install to the latest or the named release; only for an install.sh/install.ps1 install)
 ```

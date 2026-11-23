@@ -60,6 +60,7 @@ turf clean            → delete build/
 turf audit            → per package and stdlib: files, `unsafe module;`, `unsafe { }`, `extern fn`, C libraries, whether `[unsafe] allow` grants it
 turf graph --unsafe   → the package graph JSON plus each package's unsafe surface
 turf run file.tr      → run one file on its own, outside the package
+turf upgrade [--check] [--version V]  → (turf 1.2.0+) move the install (turf, turfc, stdlib) to the latest or the named release: runs that release's own installer after checking it against `checksums.txt`; `--check` installs nothing; only for an install made by `install.sh`/`install.ps1`
 ```
 
 Debug and release builds: `-O0 -g` for debugging, the default `-O2` for release. All runtime checks stay in both.
@@ -88,7 +89,7 @@ fn helper(): int { return 1; }      // private: invisible to other modules
 - Mark every function, method, type, error, machine, `extern fn` **and field** that callers need with `pub`. Leave everything else private.
 - A `pub` signature cannot mention a non-`pub` type (E089).
 - Operators have no `pub`; they follow their types.
-- Constants: `export immut MAX: int = 10;`.
+- Constants: `pub immut MAX: int = 10;` (another module reads it as `m::MAX`). A plain top-level `immut MAX: int = 10;` is private to its module; from elsewhere it is E088. (`export immut` is the old spelling, warning E176.)
 - `turf migrate pub --write mod.tr` adds `pub` everywhere (the 1.x behaviour). Afterwards, remove it from internals.
 - Check a module alone with `turf check --module src/geometry.tr`.
 
@@ -130,7 +131,7 @@ A test is a **whole program** in `tests/` (any depth). One file is one test, and
   - Always pin `fail_` tests. An unpinned one passes on *any* compile error, including a typo in the test itself.
   - To discover the code, run the file without the `fail_` prefix and read the header, or pin `E000` to have the failure message print the diagnostic.
   - Keep each `fail_` test to one mistake.
-- **`@test` functions:** a file in `tests/` can hold `fn name(): void { ... }` (or `(): !void`) marked `@test`; each runs in its own process and is reported as `[tests] file.tr: name ... PASS`. Without an outcome it passes when it returns. Outcomes: `@test(compile_error, E041, "text")` (+ `fix: "text"`), `@test(warning, E172, "text")`, `@test(no_warnings)`, `@test(panic, "text")`, `@test(exit, 3)`, `@test(error, Type::Variant)`. Such a file needs no `main`. `@test` functions in `src/` files run too (beside the code they check; private items are visible). A `compile_error` test's expected errors and a `warning` test's expected warning are the test's own: the build succeeds and no lint level applies to them. A normal build checks these functions and leaves them out; nothing may call a test or use it as a value (E173). A malformed one is E146.
+- **`@test` functions:** a file in `tests/` can hold `fn name(): void { ... }` (or `(): !void`) marked `@test`; each runs in its own process and is reported as `[tests] file.tr: name ... PASS`. Without an outcome it passes when it returns. Outcomes: `@test(compile_error, E041, "text")` (+ `fix: "text"`), `@test(warning, E172, "text")`, `@test(no_warnings)`, `@test(panic, "text")`, `@test(exit, 3)`, `@test(error, Type::Variant)`. Such a file needs no `main`. `@test` functions in `src/` files run too (beside the code they check; private items are visible). A `compile_error` test's expected errors and a `warning` test's expected warning are the test's own: the build succeeds and no lint level applies to them. A normal build checks these functions and leaves them out; nothing may call a test or use it as a value (E173). After the outcome come options (2.3.0+), each once, values literal: `skip: "reason"` (compiled, not run, reported `SKIPPED (reason)`), `timeout: 2000` (ms), `levels: all` or `levels: [O0, O2]` (built and run at each, reported `name [-O2]`), `stdout: "3\n"` (exact stdout), `tag: "slow"` or `tag: ["io", "slow"]` (`turf test --tag slow` / `--skip-tag slow`), and bare `serial`; e.g. `@test(panic, "Division by zero", timeout: 2000)`. A `compile_error` test takes no `timeout:` or `stdout:`. A malformed one, or an unknown or repeated option, is E146.
 - **Environment:** tests run in parallel, each in its own directory (data files beside the test can be opened by relative path), with no stdin and a 5 s timeout. Flags: `--jobs N`, `--timeout S`, `--exclude PATH`, `-O0…`.
 - **Imports:** a test can import the package's own modules (including internal ones), its direct dependencies, the stdlib and `*_module.tr` helpers.
 - **Errors:** a project with no test anywhere (no `tests/` and no `@test` in `src/`, or a `tests/` with no tests) is an error, not a pass.

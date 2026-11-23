@@ -1,4 +1,4 @@
-# TurfLang 2.2 language reference (condensed)
+# TurfLang 2.3 language reference (condensed)
 
 Condensed from the official reference (`docs/reference/*.md` in the turf-lang repo). Every rule here comes from those pages. The codes in parentheses are what the compiler reports when you break the rule; look them up in `error-codes.md`.
 
@@ -11,12 +11,12 @@ Contents: 1 Lexical · 2 Variables & types · 3 Conversions · 4 Operators · 5 
 - **Comments:** `//` to end of line only. There are no block comments.
 - **Statements** end in `;`. Blocks use `{ }`. A `do { } while c;` loop needs its final `;`.
 - **Reserved words:** `as bool break caller_location char compare continue defer do done double else elseif enum error export extern false float fn for give guess if immut immutable import in int int32 machine matches mut mutable null operator otherwise produce ptr pub public recover return run self sizeof static step string struct to true try unsafe void while`. `_` is the wildcard (E092 as a name).
-  - Not reserved: `typeof`, `heap`, `hash_of`, `from`, `transition`.
+  - Not reserved: `typeof`, `heap`, `hash_of`, `from`, `transition`, `function`. `function` is a contextual spelling of `fn` where a declaration starts (after `;`, `}`, `{`, `)`, `pub`, `extern` or an annotation, with a name or `<` next) and an ordinary identifier everywhere else (`immut function: int = 2;`). Write `fn`. `func`, `def` and `fun` at a declaration start are E014 with a `Fix:` writing `fn`.
   - Using a reserved word as a name is E108 (variables, functions) or E087 (`pub`).
 - **Integer literals:** `42`, `1_000_000`, `0xFF`, `0b1010`, `0o17`.
   - `0755` is decimal 755, not octal.
   - No suffixes. A negative literal is unary `-`.
-- **Float literals:** `1.5`, `.5`, `1e6`, `1.5e-3`. `5.` is E139.
+- **Float literals:** `1.5`, `.5`, `1e6`, `1.5e-3`. `5.` is E139. As a call receiver a decimal literal is written in parentheses, `(1.5).floor()`, `(1e3).f()`; `1.5.floor()` still compiles but is warning E174 (`Fix:` writes the parentheses). `1.twice()` and `(-1).abs()` are fine as written; `-1.abs()` is `-(1.abs())`.
 - **Char literals:** exactly one byte: `'a'`, `'\n'`, `'\''`. `''` and `'ab'` are E101.
 - **String literals:** `"..."`, single line only (E099 if unterminated).
 - **Escapes:** `\n \t \r \0 \\ \' \" \a \b \f \v`. Any other escape is E100; there is no `\x41` or `\u`.
@@ -34,7 +34,7 @@ Contents: 1 Lexical · 2 Variables & types · 3 Conversions · 4 Operators · 5 
   - Literal defaults: integer → `int`, float → `double`, `[a, b]` → `T[2]`.
   - Inference never applies to parameters, returns or fields.
   - `mut x = null;` and inferring from a `void` call are E129.
-  - A generic type with nothing to infer from is E129 (`mut l = List::default();`).
+  - A generic type with nothing to infer from is E129 (`mut l = List::default();`); write `mut l = List<int>::default();` (section 13).
   - An inferred type is fixed: `mut x = 5; x = 5.5;` is E066.
 - **Definite assignment:** a `mut` declared without a value must be assigned on every path before it is read (E008).
   - A loop body may run zero times, so an assignment inside it does not count.
@@ -330,7 +330,7 @@ fn main(): int {
   - `@ownership(acquires)` / `@ownership(releases: p)` (raw-memory tracking);
   - `@ffi(linux: sym)`;
   - `@deprecated("use add_all instead")` on a `fn` or `extern fn`: every call is warning E172 with that message (the program still compiles);
-  - `@test` / `@test(compile_error, E041, "text")` / `@test(panic, "text")` / `@test(exit, 3)` / `@test(error, Type::Variant)` (a test function; see projects-and-testing.md).
+  - `@test` / `@test(compile_error, E041, "text")` / `@test(panic, "text")` / `@test(exit, 3)` / `@test(error, Type::Variant)`, then options such as `timeout: 2000`, `skip: "reason"`, `tag: "slow"` (a test function; see projects-and-testing.md).
 
 ```turflang
 struct Counter { n: int }
@@ -374,7 +374,8 @@ fn main(): int {
   - Exactly one file must answer to the name (E090 if two do), and module names are never paths.
   - A module must not share a name with a stdlib module (e.g. `list.tr`). Missing modules are E027, circular imports E019.
 - **`::` vs `.`:** `::` names namespace members: `m::f()`, `Enum::V`, `Type::static_m()`, `Type::new()`, `m::Type::default()`. `.` reaches into values. E048 for `io.printline`, E029 for `var::x`, E052 for calling a static method through a value.
-- **Constants:** `export immut LIMIT: int = 10;` must be top-level, must have a literal or foldable value, and is always public. The number may start with one `-`: `export immut BELOW: int = -5;`.
+- **Constants:** a top-level `immut LIMIT: int = 10;` is a module constant: it must have a literal or foldable value, is private to its module, and is shared with `pub immut LIMIT: int = 10;` (`public immut` too), reached as `m::LIMIT` or by name after an import. From another module a private one is E088. The number may start with one `-`: `pub immut BELOW: int = -5;`. A top-level `mut` is E087, a constant inside a block E023, a non-foldable value E022.
+  - `export immut` is the old spelling of `pub immut` (same meaning, warning E176, `Fix:` writes `pub`).
 - **Visibility:** everything is private to its module unless marked `pub` (or `public`).
   - Applies to functions, methods, structs, enums, errors, machines, `extern fn`s **and each struct field**.
   - Enum variants and machine states follow their type. Operators follow their operand types; `pub operator` is E087.
@@ -397,7 +398,7 @@ fn Account.new(owner: string): void {        // constructor: assign every field 
 }
 fn Account.deposit(amount: int): void { self.balance += amount; }      // self is a reference
 fn Account.describe(): string { return self.owner + ": " + (self.balance to string); }
-fn Account.bank_name() static: string { return "Turf Bank"; }          // no self; call with ::
+static fn Account.bank_name(): string { return "Turf Bank"; }          // no self; call with ::
 
 fn main(): int {
     mut a: Account = Account::new("ada");
@@ -412,7 +413,8 @@ fn main(): int {
 - **Declaration:** `struct Name { field: Type, ... }` (trailing comma optional). An empty `struct NS {}` works as a namespace for static methods. Duplicate fields are E114, `void` fields E112.
 - **Construction:** only `T::default()` (zeroed, always available, cannot be declared; E051) or `T::new(args)` (your `fn T.new`, which returns `void` and assigns `self`). There is **no** `T { ... }` literal (E113).
   - `new` without a declaration is E050. `p.new()` is E045. `static new` is E046.
-- **Methods:** `fn T.m(params): R` takes an implicit `self` by reference. Static methods are written `fn T.m(params) static: R` and called as `T::m()`.
+- **Methods:** `fn T.m(params): R` takes an implicit `self` by reference. Static methods are written `static fn T.m(params): R` (`pub static fn` when public) and called as `T::m()`.
+  - Old code puts the word after the parameters, `fn T.m(params) static: R`. It compiles, as warning E175 (`Fix:` moves the word). `static` in both places is E103, `static pub fn` is E087 (write `pub static fn`).
   - `fn T::m` is the old syntax (E113). Unknown methods are E054.
   - Methods can be declared anywhere in the file.
   - An `immut` struct cannot call a method that mutates `self` (E060).
@@ -468,7 +470,7 @@ import list::List;
 struct Pair<A, B> { first: A, second: B }
 
 fn<A, B> Pair.swap(): Pair<B, A> {          // methods repeat the struct's type params (E138)
-    mut r: Pair<B, A> = Pair::default();
+    mut r: Pair<B, A> = Pair<B, A>::default();
     r.first = self.second;
     r.second = self.first;
     return r;
@@ -485,11 +487,11 @@ fn<T> max_by(items: List<T>, less: fn(T, T): bool): T {
 fn shorter(a: string, b: string): bool { return a.length() < b.length(); }
 
 fn main(): int {
-    mut p: Pair<int, string> = Pair::default();   // the type args come from the declaration
+    mut p: Pair<int, string> = Pair<int, string>::default();   // type args written where it is built
     p.first = 1;
     p.second = "one";
     immut q: Pair<string, int> = p.swap();
-    mut words: List<string> = List::default();
+    mut words: List<string> = List<string>::default();
     words.push("a");
     words.push("abc");
     printline(q.first + " " + max_by(words, shorter));
@@ -503,6 +505,7 @@ fn main(): int {
   - For functions, type arguments are inferred from the arguments. Every type parameter must appear in the parameter list (`fn<T> make(): T` is E129). Arguments must agree exactly, with no widening (`pair(1, 2.5)` is E056).
   - For generic structs, type arguments come from the declared type of the destination (variable, field, parameter, return, element).
   - **Size parameters:** `fn<T, N: size> fill(value: T): T[N] { mut r: T[N]; for i in 0..N { r[i] = value; } return r; }`. `N` is an array length that reads as an `int` in the body and is a free-function-only parameter. A call gets `N` from an array argument (`reversed(a)`) or else from the type the result goes into: a written declaration type, an assignment target, a non-generic parameter, a `return` with a written return type (`mut z: int[8] = fill(0);`). Nothing gives `N` (`mut d = fill(0);`, a bare `fill(0);`): E129. `N` on a struct, method or operator, `N` used as a type, a same-named value parameter, or `N = 3` / `N++` / `&N`: E150. Copy it to change it: `mut n: int = N;`.
+  - **Type arguments are written where a generic value is built.** A construction that takes them only from the declared type (`mut p: Pair<int, string> = Pair::default();`, also an assignment, return or argument) still compiles in 2.3 but is warning E177, and `Fix:` writes them in; 3.0 makes it an error. A constructor whose own arguments fix every type argument (`Box::new(5)` for `fn<T> Box.new(v: T)`) does not warn.
   - **Written type arguments** go after `::` at the use: `List<int>::default()`, `Box<int>::new(1)`, `identity::<int>(7)`, `second::<int, string>(1, "b")`, `x.twice::<int>()`, and `identity::<int>` as a function value. A size parameter is not written (`fill::<double>(1)` writes `T` only). `f<int>(x)` without the `::` is E110.
   - Generic types without arguments are E138; the wrong argument count is E148.
 - **No constraints or traits:** the body may use any operation; the instantiation fails at your call site if `T` lacks it. The error is the normal code (E124, E057, E068, E131), with `Note:` lines showing the instantiation chain. To accept types without an operation, take a function parameter.
@@ -545,7 +548,8 @@ fn main(): int {
 - **Storage:** the stack (primitives, structs, `T[N]`, collection handles), the GC heap (produced strings, collection storage, `heap(expr)`), and the manual heap (`mem::alloc`, inside `unsafe` only). There are no finalizers; use `defer` for OS resources.
 - **`&T`:** a non-null reference made with `&var`, `&s.field`, `&a[i]`, or `heap(expr)`. Use it like the value: `r.field`, `r.method()`. Assigning `null` to it is E062.
 - **`&?T`:** nullable. Before reading through it, a **local variable** must be null-checked (`if r != null { }`, `if r == null { return; }`, `while r != null`, `&&` chains). Otherwise E081.
-  - A field such as `n.next` must first be copied: `mut nx: &?Node = n.next; if nx != null { ... }`.
+  - A field path is checked the same way: `if n.next != null { return n.next.val; }`, `if h.next != null && h.next.next != null { ... }`. The check on a field lasts until the next function or method call, a write to a field of the same name, a write to the root variable or to a whole struct or array element, and is forgotten inside a `defer`. To keep a checked value across a call, name it: `immut nx: &Node = n.next;`.
+  - A checked `&?T` variable or field path is accepted where a `&T` is expected (argument, return, stored value) without `to &T`. An unchecked one is E082 there and E081 when read through. A `&?T` from a call or a list element is checked by putting it in a variable first.
   - `&T` widens to `&?T` implicitly.
 - **`heap(expr)`:** copies the value to the GC heap and returns a `&T` that lives as long as it is reachable. Use it to return or store anything you built locally.
 - **Escape rules (E086):** a reference to a local (or into a local array) cannot be:
